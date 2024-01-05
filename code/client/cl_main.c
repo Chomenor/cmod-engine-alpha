@@ -245,7 +245,9 @@ void CL_StopRecord_f( void ) {
 	if ( clc.recordfile != FS_INVALID_HANDLE ) {
 		char tempName[MAX_OSPATH];
 		char finalName[MAX_OSPATH];
+#ifndef ELITEFORCE
 		int protocol;
+#endif
 		int	len, sequence;
 
 		// finish up
@@ -255,6 +257,7 @@ void CL_StopRecord_f( void ) {
 		FS_FCloseFile( clc.recordfile );
 		clc.recordfile = FS_INVALID_HANDLE;
 
+#ifndef ELITEFORCE
 		// select proper extension
 		if ( clc.dm68compat || clc.demoplaying ) {
 			protocol = OLD_PROTOCOL_VERSION;
@@ -265,10 +268,15 @@ void CL_StopRecord_f( void ) {
 		if ( com_protocol->integer != DEFAULT_PROTOCOL_VERSION ) {
 			protocol = com_protocol->integer;
 		}
+#endif
 
 		Com_sprintf( tempName, sizeof( tempName ), "%s.tmp", clc.recordName );
 
+#ifdef ELITEFORCE
+		Com_sprintf( finalName, sizeof( finalName ), "%s.%s", clc.recordName, clc.compat ? "efdemo" : "dm_26" );
+#else
 		Com_sprintf( finalName, sizeof( finalName ), "%s.%s%d", clc.recordName, DEMOEXT, protocol );
+#endif
 
 		if ( clc.explicitRecordName ) {
 			FS_Remove( finalName );
@@ -276,8 +284,13 @@ void CL_StopRecord_f( void ) {
 			// add sequence suffix to avoid overwrite
 			sequence = 0;
 			while ( FS_FileExists( finalName ) && ++sequence < 1000 ) {
+#ifdef ELITEFORCE
+				Com_sprintf( finalName, sizeof( finalName ), "%s-%02d.%s",
+					clc.recordName, sequence, clc.compat ? "efdemo" : "dm_26" );
+#else
 				Com_sprintf( finalName, sizeof( finalName ), "%s-%02d.%s%d",
 					clc.recordName, sequence, DEMOEXT, protocol );
+#endif
 			}
 		}
 
@@ -337,11 +350,23 @@ static void CL_WriteGamestate( qboolean initial )
 	entityState_t	nullstate;
 
 	// write out the gamestate message
+#ifdef ELITEFORCE
+	if ( clc.compat )
+	{
+		MSG_InitOOB( &msg, bufData, MAX_MSGLEN );
+		msg.compat = qtrue;
+	}
+	else
+	{
+#endif
 	MSG_Init( &msg, bufData, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 
 	// NOTE, MRE: all server->client messages now acknowledge
 	MSG_WriteLong( &msg, clc.reliableSequence );
+#ifdef ELITEFORCE
+	}
+#endif
 
 	if ( initial ) {
 		clc.demoMessageSequence = 1;
@@ -377,10 +402,19 @@ static void CL_WriteGamestate( qboolean initial )
 	}
 
 	// finalize message
+#ifdef ELITEFORCE
+	if ( msg.compat )
+		MSG_WriteByte( &msg, 0 );
+	else
+#endif
 	MSG_WriteByte( &msg, svc_EOF );
 
 	// finished writing the gamestate stuff
 
+#ifdef ELITEFORCE
+	if ( !msg.compat )
+	{
+#endif
 	// write the client num
 	MSG_WriteLong( &msg, clc.clientNum );
 
@@ -389,6 +423,9 @@ static void CL_WriteGamestate( qboolean initial )
 
 	// finished writing the client packet
 	MSG_WriteByte( &msg, svc_EOF );
+#ifdef ELITEFORCE
+	}
+#endif
 
 	// write it to the demo file
 	if ( clc.demoplaying )
@@ -496,16 +533,32 @@ static void CL_WriteSnapshot( void ) {
 		oldSnap = &saved_snap;
 	}
 
+#ifdef ELITEFORCE
+	if ( clc.compat )
+	{
+		MSG_InitOOB( &msg, bufData, MAX_MSGLEN );
+		msg.compat = qtrue;
+	}
+	else
+	{
+#endif
 	MSG_Init( &msg, bufData, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
 
 	// NOTE, MRE: all server->client messages now acknowledge
 	MSG_WriteLong( &msg, clc.reliableSequence );
+#ifdef ELITEFORCE
+	}
+#endif
 
 	// Write all pending server commands
 	CL_WriteServerCommands( &msg );
 
 	MSG_WriteByte( &msg, svc_snapshot );
+#ifdef ELITEFORCE
+	if ( clc.compat )
+		MSG_WriteLong( &msg, clc.reliableSequence );
+#endif
 	MSG_WriteLong( &msg, snap->serverTime ); // sv.time
 	MSG_WriteByte( &msg, clc.demoDeltaNum ); // 0 or 1
 	MSG_WriteByte( &msg, snap->snapFlags );  // snapFlags
@@ -519,6 +572,9 @@ static void CL_WriteSnapshot( void ) {
 	CL_EmitPacketEntities( oldSnap, snap, &msg, saved_ents );
 
 	// finished writing the client packet
+#ifdef ELITEFORCE
+	if ( !msg.compat )
+#endif
 	MSG_WriteByte( &msg, svc_EOF );
 
 	// write it to the demo file
@@ -721,6 +777,14 @@ void CL_ReadDemoMessage( void ) {
 	clc.serverMessageSequence = LittleLong( s );
 
 	// init the message
+#ifdef ELITEFORCE
+	if( clc.compat )
+	{
+		MSG_InitOOB( &buf, bufData, sizeof(bufData) );
+		buf.compat = qtrue;
+	}
+	else
+#endif
 	MSG_Init( &buf, bufData, MAX_MSGLEN );
 
 	// get the length
@@ -777,6 +841,13 @@ static int CL_WalkDemoExt( const char *arg, char *name, int name_len, fileHandle
 
 	while ( demo_protocols[ i ] )
 	{
+#ifdef ELITEFORCE
+		if ( demo_protocols[ i ] == 24 ) {
+			Com_sprintf( name, name_len, "demos/%s.efdemo", arg );
+		} 
+		
+		else
+#endif
 		Com_sprintf( name, name_len, "demos/%s.%s%d", arg, DEMOEXT, demo_protocols[ i ] );
 		FS_BypassPure();
 		FS_FOpenFileRead( name, handle, qtrue );
@@ -857,14 +928,29 @@ static void CL_PlayDemo_f( void ) {
 		return;
 	}
 
+#ifdef NEW_FILESYSTEM
+	// Refresh here in case a demo was just recorded or manually added
+	FS_AutoRefresh();
+#endif
+
 	// open the demo file
 	arg = Cmd_Argv( 1 );
 
 	// check for an extension .DEMOEXT_?? (?? is protocol)
 	ext_test = strrchr(arg, '.');
+#ifdef ELITEFORCE
+	if ( ext_test && *ext_test &&
+			( !Q_stricmpn(ext_test + 1, DEMOEXT, ARRAY_LEN(DEMOEXT) - 1) || !Q_stricmp(ext_test + 1, "efdemo") ) )
+	{
+		if ( !Q_stricmp(ext_test + 1, "efdemo") )
+			protocol = 24;
+		else
+			protocol = atoi(ext_test + ARRAY_LEN(DEMOEXT));
+#else
 	if ( ext_test && !Q_stricmpn(ext_test + 1, DEMOEXT, ARRAY_LEN(DEMOEXT) - 1) )
 	{
 		protocol = atoi(ext_test + ARRAY_LEN(DEMOEXT));
+#endif
 
 		for( i = 0; demo_protocols[ i ]; i++ )
 		{
@@ -998,7 +1084,11 @@ Called by Com_GameRestart, CL_FlushMemory and SV_SpawnServer
 CL_ShutdownAll
 =====================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_ShutdownAll, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_ShutdownAll( void ) {
+#endif
 
 #ifdef USE_CURL
 	CL_cURL_Shutdown();
@@ -1031,7 +1121,11 @@ void CL_ShutdownAll( void ) {
 CL_ClearMemory
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_ClearMemory, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_ClearMemory( void ) {
+#endif
 	// if not running a server clear the whole hunk
 	if ( !com_sv_running->integer ) {
 		// clear the whole hunk
@@ -1053,7 +1147,14 @@ Called by CL_Disconnect_f, CL_DownloadsComplete
 Also called by Com_Error
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_FlushMemory, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_FlushMemory( void ) {
+#endif
+#ifdef NEW_FILESYSTEM
+	FS_ReadCache_AdvanceStage();
+#endif
 
 	// shutdown all the client stuff
 	CL_ShutdownAll();
@@ -1073,7 +1174,11 @@ screen to let the user know about it, then dump all client
 memory on the hunk from cgame, ui, and renderer
 =====================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_MapLoading, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_MapLoading( void ) {
+#endif
 	if ( com_dedicated->integer ) {
 		cls.state = CA_DISCONNECTED;
 		Key_SetCatcher( KEYCATCH_CONSOLE );
@@ -1160,7 +1265,11 @@ static void CL_UpdateGUID( const char *prefix, int prefix_len )
 CL_ResetOldGame
 =====================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_ResetOldGame, (void), (), "CLIENTSTATE" )
+#else
 void CL_ResetOldGame( void )
+#endif
 {
 	cl_oldGameSet = qfalse;
 	cl_oldGame[0] = '\0';
@@ -1174,10 +1283,18 @@ CL_RestoreOldGame
 change back to previous fs_game
 =====================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( qboolean, CL_RestoreOldGame, (void), (), "CLIENTSTATE" )
+#else
 static qboolean CL_RestoreOldGame( void )
+#endif
 {
 	if ( cl_oldGameSet )
 	{
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_RestoreOldGame transitioning fs_game from '%s' to '%s'\n",
+				Cvar_VariableString("fs_game"), cl_oldGame );
+#endif
 		cl_oldGameSet = qfalse;
 		Cvar_Set( "fs_game", cl_oldGame );
 		FS_ConditionalRestart( clc.checksumFeed, qtrue );
@@ -1197,7 +1314,11 @@ Sends a disconnect message to the server
 This is also called on Com_Error and Com_Quit, so it shouldn't cause any errors
 =====================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( qboolean, CL_Disconnect, (qboolean showMainMenu), (showMainMenu), "CLIENTSTATE" ) {
+#else
 qboolean CL_Disconnect( qboolean showMainMenu ) {
+#endif
 	static qboolean cl_disconnecting = qfalse;
 	qboolean cl_restarted = qfalse;
 
@@ -1251,11 +1372,23 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NONE );
 	}
 
+#ifdef NEW_FILESYSTEM
+	FS_DisconnectCleanup();
+#ifdef USE_CURL
+	if ( !clc.cURLReconnecting ) {
+		FS_ClearAttemptedDownloads();
+	}
+	clc.cURLReconnecting = qfalse;
+#else
+	FS_ClearAttemptedDownloads();
+#endif
+#else
 	// Remove pure paks
 	FS_PureServerSetLoadedPaks( "", "" );
 	FS_PureServerSetReferencedPaks( "", "" );
 
 	FS_ClearPakReferences( FS_GENERAL_REF | FS_UI_REF | FS_CGAME_REF );
+#endif
 
 	if ( CL_GameSwitch() ) {
 		// keep current gamestate and connection
@@ -1495,7 +1628,11 @@ static void CL_ForwardToServer_f( void ) {
 CL_Disconnect_f
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_Disconnect_f, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_Disconnect_f( void ) {
+#endif
 	SCR_StopCinematic();
 	Cvar_Set( "ui_singlePlayerActive", "0" );
 	if ( cls.state != CA_DISCONNECTED && cls.state != CA_CINEMATIC ) {
@@ -1540,7 +1677,11 @@ static void CL_Reconnect_f( void ) {
 CL_Connect_f
 ================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_Connect_f, (void), (), "CLIENTSTATE" ) {
+#else
 static void CL_Connect_f( void ) {
+#endif
 	netadrtype_t family;
 	netadr_t	addr;
 	char	buffer[ sizeof( cls.servername ) ];  // same length as cls.servername
@@ -1755,6 +1896,11 @@ static void CL_SendPureChecksums( void ) {
 		return;
 
 	// if we are pure we need to send back a command with our referenced pk3 checksums
+#ifdef ELITEFORCE
+	if( clc.compat )
+		len = sprintf( cMsg, "cp " );
+	else
+#endif
 	len = sprintf( cMsg, "cp %d ", cl.serverId );
 	strcpy( cMsg + len, FS_ReferencedPakPureChecksums( sizeof( cMsg ) - len - 1 ) );
 
@@ -1803,8 +1949,15 @@ static void CL_Vid_Restart( refShutdownCode_t shutdownCode ) {
 	// client is no longer pure until new checksums are sent
 	CL_ResetPureClientAtServer();
 
+#ifdef NEW_FILESYSTEM
+		// Refresh in case files have been manually changed
+		FS_AutoRefresh();
+
+		// New filesystem currently doesn't store ui and cgame references
+#else
 	// clear pak references
 	FS_ClearPakReferences( FS_UI_REF | FS_CGAME_REF );
+#endif
 
 	// reinitialize the filesystem if the game directory or checksum has changed
 	if ( !clc.demoplaying ) // -EC-
@@ -1874,6 +2027,7 @@ static void CL_Snd_Restart_f( void )
 }
 
 
+#ifndef NEW_FILESYSTEM
 /*
 ==================
 CL_PK3List_f
@@ -1892,6 +2046,7 @@ CL_PureList_f
 static void CL_ReferencedPK3List_f( void ) {
 	Com_Printf( "Referenced PK3 Names: %s\n", FS_ReferencedPakNames() );
 }
+#endif
 
 
 /*
@@ -1989,7 +2144,11 @@ CL_DownloadsComplete
 Called when all downloading has been completed
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_DownloadsComplete, (void), (), "CLIENTSTATE" ) {
+#else
 static void CL_DownloadsComplete( void ) {
+#endif
 
 #ifdef USE_CURL
 	// if we downloaded with cURL
@@ -1997,10 +2156,15 @@ static void CL_DownloadsComplete( void ) {
 		clc.cURLUsed = qfalse;
 		CL_cURL_Shutdown();
 		if ( clc.cURLDisconnected ) {
+#ifdef NEW_FILESYSTEM
+			clc.downloadRestart = qfalse;
+			clc.cURLReconnecting = qtrue;	// Don't reset attempted downloads
+#else
 			if ( clc.downloadRestart ) {
 				FS_Restart( clc.checksumFeed );
 				clc.downloadRestart = qfalse;
 			}
+#endif
 			clc.cURLDisconnected = qfalse;
 			CL_Reconnect_f();
 			return;
@@ -2008,11 +2172,15 @@ static void CL_DownloadsComplete( void ) {
 	}
 #endif
 
+#ifndef NEW_FILESYSTEM
 	// if we downloaded files we need to restart the file system
+#endif
 	if ( clc.downloadRestart ) {
 		clc.downloadRestart = qfalse;
 
+#ifndef NEW_FILESYSTEM
 		FS_Restart(clc.checksumFeed); // We possibly downloaded a pak, restart the file system to load it
+#endif
 
 		// inform the server so we get new gamestate info
 		CL_AddReliableCommand( "donedl", qfalse );
@@ -2039,7 +2207,14 @@ static void CL_DownloadsComplete( void ) {
 	// if this is a local client then only the client part of the hunk
 	// will be cleared, note that this is done after the hunk mark has been set
 	//if ( !com_sv_running->integer )
+#ifdef NEW_FILESYSTEM
+	CL_SystemInfoChanged( qfalse );
+	if ( !FS_ConditionalRestart( clc.checksumFeed, qfalse ) ) {
+	}
 	CL_FlushMemory();
+#else
+	CL_FlushMemory();
+#endif
 
 	// initialize the CGame
 	cls.cgameStarted = qtrue;
@@ -2075,7 +2250,11 @@ static void CL_BeginDownload( const char *localName, const char *remoteName ) {
 				"****************************\n", localName, remoteName);
 
 	Q_strncpyz ( clc.downloadName, localName, sizeof(clc.downloadName) );
+#ifdef NEW_FILESYSTEM
+	Com_sprintf( clc.downloadTempName, sizeof(clc.downloadTempName), "download.temp" );
+#else
 	Com_sprintf( clc.downloadTempName, sizeof(clc.downloadTempName), "%s.tmp", localName );
+#endif
 
 	// Set so UI gets access to it
 	Cvar_Set( "cl_downloadName", remoteName );
@@ -2097,8 +2276,103 @@ CL_NextDownload
 A download completed or failed
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_NextDownload, (void), (), "CLIENTSTATE" )
+#else
 void CL_NextDownload( void )
+#endif
 {
+#ifdef NEW_FILESYSTEM
+	// Attempts to initiate a download, or calls CL_DownloadsComplete if no more downloads are available
+	*clc.downloadTempName = *clc.downloadName = 0;
+	Cvar_Set( "cl_downloadName", "" );
+
+	while ( 1 ) {
+		char *remoteName, *localName;
+		qboolean curl_already_attempted = qfalse;
+
+		// Get next potential download
+#ifdef USE_CURL
+		FS_AdvanceToNextNeededDownload( clc.cURLDisconnected );
+#else
+		FS_AdvanceToNextNeededDownload( qfalse );
+#endif
+		if ( !FS_GetCurrentDownloadInfo( &localName, &remoteName, &curl_already_attempted ) ) {
+			CL_DownloadsComplete();
+			return;
+		}
+
+		// Check some skip conditions
+		if ( !( cl_allowDownload->integer & DLF_ENABLE ) ) {
+			Com_Printf( "WARNING: Skipping download '%s' because all downloads are disabled "
+					"on your client (cl_allowDownload is %d)\n", localName, cl_allowDownload->integer );
+			FS_AdvanceDownload();
+			continue;
+		}
+		if ( com_sv_running->integer ) {
+			// Don't do any downloads when connected to a local game
+			// Otherwise the game could try to download from itself under certain circumstances
+			Com_Printf( "WARNING: Skipping download '%s' because the game appears to be local.\n", localName );
+			FS_AdvanceDownload();
+			continue;
+		}
+
+#ifdef USE_CURL
+		// Attempt cURL download
+		if ( curl_already_attempted ) {
+			Com_Printf( "NOTE: Attempting UDP download for '%s' because a cURL download appears"
+					" to have been unsuccessful.\n", localName );
+		}
+
+		else if ( !( cl_allowDownload->integer & DLF_NO_REDIRECT ) ) {
+			// cURL download enabled in client
+			if ( !*clc.sv_dlURL ) {
+				Com_Printf( "NOTE: cURL download not available because server did not set sv_dlURL\n" );
+			} else if ( clc.sv_allowDownload & DLF_NO_REDIRECT ) {
+				Com_Printf( "NOTE: cURL download not available due to server setting"
+						" (sv_allowDownload is %d)\n", clc.sv_allowDownload );
+			} else if ( !CL_cURL_Init() ) {
+				Com_Printf( "NOTE: could not load cURL library\n" );
+			} else {
+				// Begin cURL Download
+				FS_RegisterCurrentDownloadAttempt( qtrue );
+				// Using remoteName instead of localName for UI purposes
+				CL_cURL_BeginDownload( remoteName, va( "%s/%s", clc.sv_dlURL, remoteName ) );
+				if ( !clc.cURLDisconnected ) {
+					clc.downloadRestart = qtrue;
+				}
+				return;
+			}
+		}
+
+		else if ( !( clc.sv_allowDownload & DLF_NO_REDIRECT ) && *clc.sv_dlURL ) {
+			// cURL download not enabled in client, but enabled on server
+			Com_Printf( "NOTE: cURL download not available due to client setting"
+					" (cl_allowDownload is %d)\n", cl_allowDownload->integer );
+		}
+#endif
+
+		// Attempt UDP download
+		if ( ( cl_allowDownload->integer & DLF_NO_UDP ) ) {
+			Com_Printf( "WARNING: Skipping download '%s' because UDP downloads are disabled"
+					" on your client (cl_allowDownload is %d)\n", localName, cl_allowDownload->integer );
+			FS_AdvanceDownload();
+			continue;
+		} else if ( !( clc.sv_allowDownload & DLF_ENABLE ) || ( clc.sv_allowDownload & DLF_NO_UDP ) ) {
+			Com_Printf( "WARNING: Skipping download '%s' because UDP downloads appear to be disabled"
+					" on the server (sv_allowDownload is %d)\n", localName, clc.sv_allowDownload );
+			FS_AdvanceDownload();
+			continue;
+		} else {
+			// Begin UDP Download
+			Com_Printf( "Starting UDP download for '%s'\n", localName );
+			FS_RegisterCurrentDownloadAttempt( qfalse );
+			CL_BeginDownload( localName, remoteName );
+			clc.downloadRestart = qtrue;
+			return;
+		}
+	}
+#else
 	char *s;
 	char *remoteName, *localName;
 	qboolean useCURL = qfalse;
@@ -2190,6 +2464,7 @@ void CL_NextDownload( void )
 	}
 
 	CL_DownloadsComplete();
+#endif
 }
 
 
@@ -2201,7 +2476,25 @@ After receiving a valid game state, we valid the cgame and local zip files here
 and determine if we need to download them
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_InitDownloads, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_InitDownloads( void ) {
+#endif
+#ifdef NEW_FILESYSTEM
+	cls.state = CA_CONNECTED;
+
+	*clc.downloadTempName = *clc.downloadName = 0;
+	Cvar_Set( "cl_downloadName", "" );
+	if ( clc.download ) {
+		FS_FCloseFile( clc.download );
+		clc.download = 0;
+	}
+
+	FS_PrintDownloadList();
+
+	CL_NextDownload();
+#else
 
 	if ( !(cl_allowDownload->integer & DLF_ENABLE) )
 	{
@@ -2257,6 +2550,7 @@ void CL_InitDownloads( void ) {
 #endif // USE_CURL
 
 	CL_DownloadsComplete();
+#endif
 }
 
 
@@ -2346,7 +2640,11 @@ static void CL_CheckForResend( void ) {
 
 		len = Com_sprintf( data, sizeof( data ), "connect \"%s\"", info );
 		// NOTE TTimo don't forget to set the right data length!
+#ifdef ELITEFORCE
+		NET_OutOfBandPrint( NS_CLIENT, &clc.serverAddress, "%s", data);
+#else
 		NET_OutOfBandCompress( NS_CLIENT, &clc.serverAddress, (byte *) &data[0], len );
+#endif
 		// the most current userinfo has been sent, so watch for any
 		// newer changes to userinfo variables
 		cvar_modifiedFlags &= ~CVAR_USERINFO;
@@ -2497,6 +2795,9 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 	byte*			buffptr;
 	byte*			buffend;
 	serverInfo_t	*server;
+#ifdef ELITEFORCE
+	char strbyte[3] = "FF";
+#endif
 
 	//Com_Printf("CL_ServersResponsePacket\n"); // moved down
 
@@ -2528,11 +2829,30 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 		{
 			buffptr++;
 
+#ifdef ELITEFORCE
+			if (buffend - buffptr < sizeof(addresses[numservers].ipv._4) * 2 + sizeof(addresses[numservers].port) * 2 + 1)
+				break;
+
+			// EliteForce uses a slightly different format with bytes encoded
+			// in hex values.
+			for(i = 0; i < 6; i++)
+			{
+				strbyte[0] = toupper(*buffptr++);
+				strbyte[1] = toupper(*buffptr++);
+
+				if(i < 4)
+					addresses[numservers].ipv._4[i] = strtoul(strbyte, NULL, 16);
+				else
+					((unsigned char *) &addresses[numservers].port)[i - 4] =
+						strtoul(strbyte, NULL, 16);
+			}
+#else
 			if (buffend - buffptr < sizeof(addresses[numservers].ipv._4) + sizeof(addresses[numservers].port) + 1)
 				break;
 
 			for(i = 0; i < sizeof(addresses[numservers].ipv._4); i++)
 				addresses[numservers].ipv._4[i] = *buffptr++;
+#endif
 
 			addresses[numservers].type = NA_IP;
 		}
@@ -2549,6 +2869,12 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 				addresses[numservers].ipv._6[i] = *buffptr++;
 
 			addresses[numservers].type = NA_IP6;
+#ifdef ELITEFORCE
+			// parse out port
+			addresses[numservers].port = (*buffptr++) << 8;
+			addresses[numservers].port += *buffptr++;
+			addresses[numservers].port = BigShort( addresses[numservers].port );
+#endif
 			addresses[numservers].scope_id = from->scope_id;
 		}
 #endif
@@ -2556,10 +2882,12 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 			// syntax error!
 			break;
 
+#ifndef ELITEFORCE
 		// parse out port
 		addresses[numservers].port = (*buffptr++) << 8;
 		addresses[numservers].port += *buffptr++;
 		addresses[numservers].port = BigShort( addresses[numservers].port );
+#endif
 
 		// syntax check
 		if (*buffptr != '\\' && *buffptr != '/')
@@ -2756,6 +3084,9 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 
 		Netchan_Setup( NS_CLIENT, &clc.netchan, from, Cvar_VariableIntegerValue( "net_qport" ), clc.challenge, clc.compat );
 
+#ifdef ELITEFORCE
+		clc.netchan.compat = clc.compat;
+#endif
 		cls.state = CA_CONNECTED;
 		clc.lastPacketSentTime = -9999;		// send first packet immediately
 		return qtrue;
@@ -2831,6 +3162,10 @@ A packet has arrived from the main event loop
 */
 void CL_PacketEvent( const netadr_t *from, msg_t *msg ) {
 	int		headerBytes;
+
+#ifdef ELITEFORCE
+	msg->compat = clc.compat;
+#endif
 
 	if ( msg->cursize < 5 ) {
 		Com_DPrintf( "%s: Runt packet\n", NET_AdrToStringwPort( from ) );
@@ -3207,7 +3542,11 @@ static void CL_InitRenderer( void ) {
 	re.BeginRegistration( &cls.glconfig );
 
 	// load character sets
+#ifdef ELITEFORCE
+	cls.charSetShader = re.RegisterShaderNoMip( "gfx/2d/charsgrid_med" );
+#else
 	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
+#endif
 	cls.whiteShader = re.RegisterShader( "white" );
 	cls.consoleShader = re.RegisterShader( "console" );
 
@@ -3241,7 +3580,11 @@ After the server has cleared the hunk, these will need to be restarted
 This is the only place that any of these functions are called from
 ============================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_StartHunkUsers, (void), (), "CLIENTSTATE" ) {
+#else
 void CL_StartHunkUsers( void ) {
+#endif
 
 	if ( !com_cl_running || !com_cl_running->integer ) {
 		return;
@@ -3481,6 +3824,15 @@ static void CL_InitRef( void ) {
 	rimp.VKimp_Shutdown = VKimp_Shutdown;
 	rimp.VK_GetInstanceProcAddr = VK_GetInstanceProcAddr;
 	rimp.VK_CreateSurface = VK_CreateSurface;
+#endif
+
+#ifdef NEW_FILESYSTEM
+	rimp.FS_GeneralLookup = FS_GeneralLookup;
+	rimp.FS_ImageLookup = FS_ImageLookup;
+	rimp.FS_ShaderLookup = FS_ShaderLookup;
+	rimp.FS_ReadShader = FS_ReadShader;
+	rimp.FS_GetFileExtension = FS_GetFileExtension;
+	rimp.FS_CheckFilesFromSamePk3 = FS_CheckFilesFromSamePk3;
 #endif
 
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
@@ -3863,6 +4215,10 @@ void CL_Init( void ) {
 	CL_ResetOldGame();
 
 	cls.realtime = 0;
+#ifdef ELITEFORCE
+	clc.lastPacketTime = 0;
+	clc.lastPacketSentTime = -9999;
+#endif
 
 	CL_InitInput();
 
@@ -3976,12 +4332,16 @@ void CL_Init( void ) {
 	Cvar_Get ("name", "UnnamedPlayer", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("snaps", "40", CVAR_USERINFO | CVAR_ARCHIVE );
+#ifdef ELITEFORCE
+	Cvar_Get ("model", "munro/red", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+#else
 	Cvar_Get ("model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
  	Cvar_Get ("team_model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("team_headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 //	Cvar_Get ("g_redTeam", "Stroggs", CVAR_SERVERINFO | CVAR_ARCHIVE);
 //	Cvar_Get ("g_blueTeam", "Pagans", CVAR_SERVERINFO | CVAR_ARCHIVE);
+#endif
 	Cvar_Get ("color1", "4", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("color2", "5", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("handicap", "100", CVAR_USERINFO | CVAR_ARCHIVE_ND );
@@ -4022,8 +4382,10 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("ping", CL_Ping_f );
 	Cmd_AddCommand ("serverstatus", CL_ServerStatus_f );
 	Cmd_AddCommand ("showip", CL_ShowIP_f );
+#ifndef NEW_FILESYSTEM
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
+#endif
 	Cmd_AddCommand ("model", CL_SetModel_f );
 	Cmd_AddCommand ("video", CL_Video_f );
 	Cmd_AddCommand ("video-pipe", CL_Video_f );
@@ -4056,7 +4418,11 @@ CL_Shutdown
 Called on fatal error, quit and dedicated mode switch
 ===============
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_Shutdown, (const char *finalmsg, qboolean quit), (finalmsg, quit), "CLIENTSTATE" ) {
+#else
 void CL_Shutdown( const char *finalmsg, qboolean quit ) {
+#endif
 	static qboolean recursive = qfalse;
 
 	// check whether the client is running at all.
@@ -4185,6 +4551,19 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 	const char *infoString;
 	int		prot;
 
+#ifdef ELITEFORCE
+	// eliteforce doesn't send a \n after infoResponse..
+	char *patchString = strchr((char *) msg->data, '"');
+	if(!patchString)
+		return;
+	msg->readcount = (int) ((byte *) ++patchString - msg->data);
+	msg->bit = msg->readcount << 3;
+	// find the second " character and empty it.
+	patchString = strchr(patchString, '"');
+	if(patchString)
+		*patchString = '\0';
+#endif
+
 	infoString = MSG_ReadString( msg );
 
 	// if this isn't the correct protocol version, ignore it
@@ -4231,7 +4610,11 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 					break;
 			}
 
+#ifdef ELITEFORCE
+			Info_SetValueForKey( cl_pinglist[i].info, "nettype", type == 2 ? "udp6" : "udp");
+#else
 			Info_SetValueForKey( cl_pinglist[i].info, "nettype", va( "%d", type ) );
+#endif
 			CL_SetServerInfoByAddress( from, infoString, cl_pinglist[i].time );
 
 			return;
@@ -4310,10 +4693,20 @@ static serverStatus_t *CL_GetServerStatus( const netadr_t *from ) {
 CL_ServerStatus
 ===================
 */
+#ifdef STEF_SERVER_BROWSER_EXTENSIONS
+int CL_ServerStatusExt( const char *serverAddress, char *serverStatusString, int maxLen, char *extString, int extLen ) {
+#else
 int CL_ServerStatus( const char *serverAddress, char *serverStatusString, int maxLen ) {
+#endif
 	int i;
 	netadr_t	to;
 	serverStatus_t *serverStatus;
+
+#ifdef STEF_SERVER_BROWSER_EXTENSIONS
+	if ( extString && extLen > 0 ) {
+		extString[0] = '\0';
+	}
+#endif
 
 	// if no server address then reset all server status requests
 	if ( !serverAddress ) {
@@ -4339,6 +4732,12 @@ int CL_ServerStatus( const char *serverAddress, char *serverStatusString, int ma
 		// if we received a response for this server status request
 		if (!serverStatus->pending) {
 			Q_strncpyz(serverStatusString, serverStatus->string, maxLen);
+#ifdef STEF_SERVER_BROWSER_EXTENSIONS
+			if ( extString && extLen > 0 ) {
+				// write ping to extended info output
+				Info_SetValueForKey_s( extString, extLen, "ping", va( "%i", serverStatus->time - serverStatus->startTime ) );
+			}
+#endif
 			serverStatus->retrieved = qtrue;
 			serverStatus->startTime = 0;
 			return qtrue;
@@ -4367,6 +4766,12 @@ int CL_ServerStatus( const char *serverAddress, char *serverStatusString, int ma
 	}
 	return qfalse;
 }
+
+#ifdef STEF_SERVER_BROWSER_EXTENSIONS
+int CL_ServerStatus( const char *serverAddress, char *serverStatusString, int maxLen ) {
+	return CL_ServerStatusExt( serverAddress, serverStatusString, maxLen, NULL, 0 );
+}
+#endif
 
 
 /*
@@ -5015,7 +5420,12 @@ static void CL_ShowIP_f( void ) {
 
 #ifdef USE_CURL
 
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( qboolean, CL_Download, ( const char *cmd, const char *pakname, qboolean autoDownload ),
+		( cmd, pakname, autoDownload ), "CLIENTSTATE" )
+#else
 qboolean CL_Download( const char *cmd, const char *pakname, qboolean autoDownload )
+#endif
 {
 	char url[MAX_OSPATH];
 	char name[MAX_CVAR_VALUE_STRING];

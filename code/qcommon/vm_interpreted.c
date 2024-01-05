@@ -23,6 +23,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vm_local.h"
 
 
+#ifdef STEF_VM_FLOAT_CAST_FIX
+static int VM_tonextint( float x ) {
+	// From game code patch by Thilo Schulz
+	int casted;
+	float rest;
+
+	casted = (int)x;
+	rest = x - (float)casted;
+
+	if ( rest >= 0.5f )
+		return casted + 1;
+	else if ( rest <= -0.5f )
+		return casted - 1;
+	else
+		return casted;
+}
+#endif
+
 char *VM_Indent( vm_t *vm ) {
 	static char	*string = "                                        ";
 	if ( vm->callLevel > 20 ) {
@@ -567,7 +585,11 @@ nextInstruction2:
 			break;
 
 		case OP_CVFI:
+#ifdef STEF_VM_FLOAT_CAST_FIX
+			*opStack = VM_tonextint(r0.f);
+#else
 			*opStack = (int) r0.f;
+#endif
 			break;
 
 		case MOP_LOCAL_LOAD4:

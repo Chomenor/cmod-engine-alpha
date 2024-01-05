@@ -2279,6 +2279,52 @@ static const imageExtToLoaderMap_t imageLoaders[ ] =
 
 static const int numImageLoaders = ARRAY_LEN( imageLoaders );
 
+#ifdef NEW_FILESYSTEM
+void R_LoadImageNewFS( const char *name, byte **pic, int *width, int *height, GLenum *picFormat, int *numMips ) {
+	char localName[MAX_QPATH];
+	const fsc_file_t *file;
+	const char *extension;
+	int i;
+
+	// Default outputs
+	*pic = NULL;
+	*width = 0;
+	*height = 0;
+	*picFormat = GL_RGBA8;
+	*numMips = 0;
+
+	// Look up the file
+	COM_StripExtension( name, localName, MAX_QPATH );
+	file = ri.FS_ImageLookup( localName, r_ext_compressed_textures->integer ? LOOKUPFLAG_ENABLE_DDS : 0, qfalse );
+	if ( !file ) {
+		return;
+	}
+
+	// Get extension
+	extension = ri.FS_GetFileExtension( file );
+	if ( extension[0] == '.' ) {
+		// Skip leading dot
+		extension = &extension[1];
+	}
+
+	if ( !Q_stricmp( extension, "dds" ) ) {
+		R_LoadDDS( va( "%s.%s", localName, extension ), pic, width, height, picFormat, numMips );
+		return;
+	}
+
+	for ( i = 0; i < numImageLoaders; ++i ) {
+		if ( !Q_stricmp( extension, imageLoaders[i].ext ) ) {
+			// NOTE: It would be better to change the image loaders to take the actual fsc_file_t instead of
+			//    a string. However this seems to work for now and should *probably* have the same results.
+			imageLoaders[i].ImageLoader( va( "%s.%s", localName, extension ), pic, width, height );
+			return;
+		}
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "WARNING: R_LoadImage got file with unknown extension from FS_ImageLookup" );
+}
+#endif
+
 /*
 =================
 R_LoadImage
@@ -2295,6 +2341,13 @@ static void R_LoadImage( const char *name, byte **pic, int *width, int *height, 
 	char localName[ MAX_QPATH ];
 	const char *ext;
 	const char *altName;
+
+#ifdef NEW_FILESYSTEM
+	if ( tr.new_filesystem ) {
+		R_LoadImageNewFS( name, pic, width, height, picFormat, numMips );
+		return;
+	}
+#endif
 
 	*pic = NULL;
 	*width = 0;

@@ -26,6 +26,34 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static snd_codec_t *codecs;
 
+#ifdef ELITEFORCE
+static void *S_CodecGetSound(const char *filename, snd_info_t *info);
+
+int sem = qtrue;
+#define VOXDIR "sound/voice"
+
+void *S_MangleNameEF(char *filename, snd_info_t *info)
+{
+	char localName[MAX_QPATH];
+
+	if(
+	    !Q_strncmp(filename, VOXDIR, ARRAY_LEN(VOXDIR) - 1) &&
+	    !Q_stricmp(Cvar_VariableString("s_language"), "DEUTSCH")
+	  )
+	{
+		Q_strncpyz(localName, filename, MAX_QPATH - 10);
+
+		localName[8] = 'x';
+		localName[9] = '_';
+		localName[10] = 'd';
+
+		return S_CodecGetSound(localName, info);
+	}
+
+	return NULL;
+}
+#endif
+
 static void S_CodecRegister( snd_codec_t *codec );
 
 /*
@@ -38,6 +66,54 @@ then tries all supported codecs.
 */
 static void *S_CodecGetSound( const char *filename, snd_info_t *info )
 {
+#ifdef NEW_FILESYSTEM
+	char localName[MAX_QPATH];
+	const fsc_file_t *file;
+	const char *extension;
+	snd_codec_t *codec;
+
+	COM_StripExtension( filename, localName, MAX_QPATH );
+
+#ifdef ELITEFORCE
+	{
+		void *rtn = S_MangleNameEF( localName, info );
+		if ( rtn ) {
+			return rtn;
+		}
+	}
+#endif
+
+	// Look up the file
+	file = FS_SoundLookup( localName, 0, qfalse );
+	if ( !file ) {
+#ifdef ELITEFORCE
+		Com_DPrintf( S_COLOR_YELLOW "WARNING: Failed to %s sound %s!\n", info ? "load" : "open", filename );
+#else
+		Com_Printf( S_COLOR_YELLOW "WARNING: Failed to %s sound %s!\n", info ? "load" : "open", filename );
+#endif
+		return NULL;
+	}
+
+	// Get extension
+	extension = FS_GetFileExtension( file );
+	if ( extension[0] == '.' ) {
+		extension = &extension[1];	// Skip leading dot
+	}
+
+	for ( codec = codecs; codec; codec = codec->next ) {
+		if ( !Q_stricmp( extension, codec->ext ) ) {
+			// Load
+			if ( info ) {
+				return codec->load( va( "%s.%s", localName, codec->ext ), info );
+			} else {
+				return codec->open( va( "%s.%s", localName, codec->ext ) );
+			}
+		}
+	}
+
+	Com_Error( ERR_DROP, "S_CodecGetSound got file with unknown extension from FS_SoundLookup" );
+	return NULL;
+#else
 	snd_codec_t *codec;
 	snd_codec_t *orgCodec = NULL;
 	qboolean	orgNameFailed = qfalse;
@@ -47,6 +123,12 @@ static void *S_CodecGetSound( const char *filename, snd_info_t *info )
 	void		*rtn = NULL;
 
 	Q_strncpyz( localName, filename, sizeof( localName ) );
+
+#ifdef ELITEFORCE
+	rtn = S_MangleNameEF(localName, info);
+	if(rtn)
+		return rtn;
+#endif
 
 	ext = COM_GetExtension( localName );
 
@@ -112,9 +194,14 @@ static void *S_CodecGetSound( const char *filename, snd_info_t *info )
 		}
 	}
 
+#ifdef ELITEFORCE
+	Com_DPrintf( S_COLOR_YELLOW "WARNING: Failed to %s sound %s!\n", info ? "load" : "open", filename );
+#else
 	Com_Printf( S_COLOR_YELLOW "WARNING: Failed to %s sound %s!\n", info ? "load" : "open", filename );
+#endif
 
 	return NULL;
+#endif
 }
 
 
@@ -129,6 +216,10 @@ void S_CodecInit( void )
 
 #ifdef USE_OGG_VORBIS
 	S_CodecRegister( &ogg_codec );
+#endif
+
+#ifdef USE_CODEC_MP3
+	S_CodecRegister(&mp3_codec);
 #endif
 
 	// Register wav codec last so that it is always tried first when a file extension was not found

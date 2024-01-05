@@ -198,7 +198,9 @@ static void Con_Dump_f( void )
 	int		bufferlen;
 	char	*buffer;
 	char	filename[ MAX_OSPATH ];
+#ifndef NEW_FILESYSTEM
 	const char *ext;
+#endif
 
 	if ( Cmd_Argc() != 2 )
 	{
@@ -209,10 +211,12 @@ static void Con_Dump_f( void )
 	Q_strncpyz( filename, Cmd_Argv( 1 ), sizeof( filename ) );
 	COM_DefaultExtension( filename, sizeof( filename ), ".txt" );
 
+#ifndef NEW_FILESYSTEM
 	if ( !FS_AllowedExtension( filename, qfalse, &ext ) ) {
 		Com_Printf( "%s: Invalid filename extension '%s'.\n", __func__, ext );
 		return;
 	}
+#endif
 
 	f = FS_FOpenFileWrite( filename );
 	if ( f == FS_INVALID_HANDLE )
@@ -713,6 +717,21 @@ static void Con_DrawNotify( void )
 		// rescale to virtual 640x480 space
 		v /= cls.glconfig.vidHeight / 480.0;
 
+#ifdef ELITEFORCE
+		if (chat_team)
+		{
+			SCR_DrawSmallStringEF (8, v, "say_team:", 1.0f );
+			skip = 11;
+		}
+		else
+		{
+			SCR_DrawSmallStringEF (8, v, "say:", 1.0f );
+			skip = 6;
+		}
+
+		Field_Draw(&chatField, skip * SMALLCHAR_WIDTH, v,
+			SCREEN_WIDTH - ( skip + 1 ) * SMALLCHAR_WIDTH, qtrue, qtrue);
+#else
 		if (chat_team)
 		{
 			SCR_DrawBigString( SMALLCHAR_WIDTH, v, "say_team:", 1.0f, qfalse );
@@ -726,6 +745,7 @@ static void Con_DrawNotify( void )
 
 		Field_BigDraw( &chatField, skip * BIGCHAR_WIDTH, v,
 			SCREEN_WIDTH - ( skip + 1 ) * BIGCHAR_WIDTH, qtrue, qtrue );
+#endif
 	}
 }
 
@@ -739,7 +759,11 @@ Draws the console with the solid background
 */
 static void Con_DrawSolidConsole( float frac ) {
 
+#ifdef ELITEFORCE
+	static float conColorValue[4] = { 0.0, 0.0, 0.0, 0.85f };
+#else
 	static float conColorValue[4] = { 0.0, 0.0, 0.0, 0.0 };
+#endif
 	// for cvar value change tracking
 	static char  conColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
 

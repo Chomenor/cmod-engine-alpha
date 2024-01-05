@@ -575,6 +575,36 @@ static void VM_SwapLongs( void *data, int length )
 }
 
 
+#ifdef NEW_FILESYSTEM
+static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, const fsc_file_t *qvmFile ) {
+	const fsc_file_t *jtsFile;
+	char		filename[MAX_QPATH];
+	int			header[2];
+	int			length;
+	fileHandle_t fh;
+
+	// load the image
+	Com_sprintf( filename, sizeof(filename), "vm/%s.jts", vm->name );
+	if ( data )
+		Com_Printf( "Loading jts file %s...\n", filename );
+
+	jtsFile = FS_GeneralLookup( filename, 0, qfalse );
+
+	if ( !jtsFile ) {
+		if ( data )
+			Com_Printf( " not found.\n" );
+		return -1;
+	}
+
+	if ( !FS_CheckFilesFromSamePk3( qvmFile, jtsFile ) ) {
+		if ( data )
+			Com_Printf( " JTS file not found in same location as QVM.\n" );
+		return -1;
+	}
+
+	length = 0;
+	fh = FS_CacheReadHandle_Open( jtsFile, NULL, (unsigned int *)&length );
+#else
 static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 	char		filename[MAX_QPATH];
 	int			header[2];
@@ -599,6 +629,7 @@ static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 		FS_FCloseFile( fh );
 		return -1;
 	}
+#endif
 
 	if ( length < sizeof( header ) ) {
 		if ( data )
@@ -753,19 +784,28 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	unsigned int		crc32sum;
 	qboolean			tryjts;
 	vmHeader_t			*header;
+#ifndef NEW_FILESYSTEM
 	int					vmPakIndex;
+#endif
 
 	// load the image
 	Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
 	Com_Printf( "Loading vm file %s...\n", filename );
+#ifdef NEW_FILESYSTEM
+	length = 0;
+	header = (vmHeader_t *)FS_ReadData( vm->source_file, NULL, (unsigned int *)&length, __func__ );
+#else
 	length = FS_ReadFile( filename, (void **)&header );
+#endif
 	if ( !header ) {
 		Com_Printf( "Failed.\n" );
 		VM_Free( vm );
 		return NULL;
 	}
 
+#ifndef NEW_FILESYSTEM
 	vmPakIndex = fs_lastPakIndex;
+#endif
 
 	crc32sum = crc32_buffer( (const byte*) header, length );
 
@@ -864,7 +904,11 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 		VM_SwapLongs( vm->jumpTableTargets, header->jtrgLength );
 	}
 
+#ifdef NEW_FILESYSTEM
+	if ( tryjts == qtrue && (length = Load_JTS( vm, crc32sum, NULL, vm->source_file )) >= 0 ) {
+#else
 	if ( tryjts == qtrue && (length = Load_JTS( vm, crc32sum, NULL, vmPakIndex )) >= 0 ) {
+#endif
 		// we are trying to load newer file?
 		if ( vm->jumpTableTargets && vm->numJumpTableTargets != length >> 2 ) {
 			Com_Printf( S_COLOR_YELLOW "Reload jts file\n" );
@@ -878,7 +922,11 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 		} else {
 			Com_Memset( vm->jumpTableTargets, 0, length );
 		}
+#ifdef NEW_FILESYSTEM
+		Load_JTS( vm, crc32sum, vm->jumpTableTargets, vm->source_file );
+#else
 		Load_JTS( vm, crc32sum, vm->jumpTableTargets, vmPakIndex );
+#endif
 	}
 
 	return header;
@@ -1647,6 +1695,16 @@ This allows a server to do a map_restart without changing memory allocation
 vm_t *VM_Restart( vm_t *vm ) {
 	vmHeader_t	*header;
 
+#ifdef NEW_FILESYSTEM
+	if ( vm->dllHandle ) {
+		Sys_UnloadLibrary( vm->dllHandle );
+		vm->dllHandle = FS_LoadGameDLL( vm->source_file, &vm->entryPoint, vm->dllSyscall );
+		if ( !vm->dllHandle ) {
+			Com_Error( ERR_DROP, "VM_Restart on dll failed" );
+		}
+		return vm;
+	}
+#else
 	// DLL's can't be restarted in place
 	if ( vm->dllHandle ) {
 		syscall_t		systemCall;
@@ -1662,6 +1720,7 @@ vm_t *VM_Restart( vm_t *vm ) {
 		vm = VM_Create( index, systemCall, dllSyscall, VMI_NATIVE );
 		return vm;
 	}
+#endif
 
 	// load the image
 	if( ( header = VM_LoadQVM( vm, qfalse ) ) == NULL ) {
@@ -1678,6 +1737,7 @@ vm_t *VM_Restart( vm_t *vm ) {
 }
 
 
+#ifndef NEW_FILESYSTEM
 /*
 =================
 Sys_LoadDll
@@ -1700,7 +1760,11 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 
 	Com_sprintf( filename, sizeof( filename ), "%s%c%s" ARCH_STRING DLL_EXT, gamedir, PATH_SEP, name );
 
+#ifdef NEW_FILESYSTEM
+	libHandle = NULL;
+#else
 	libHandle = FS_LoadLibrary( filename );
+#endif
 
 	if ( !libHandle ) {
 		Com_Printf( "VM_LoadDLL '%s' failed\n", filename );
@@ -1722,6 +1786,7 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 
 	return libHandle;
 }
+#endif
 
 
 /*
@@ -1737,6 +1802,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	const char	*name;
 	vmHeader_t	*header;
 	vm_t		*vm;
+#ifdef NEW_FILESYSTEM
+	qboolean is_dll = qfalse;
+#endif
 
 	if ( !systemCalls ) {
 		Com_Error( ERR_FATAL, "VM_Create: bad parms" );
@@ -1774,6 +1842,32 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 		}
 	}
 
+#ifdef NEW_FILESYSTEM
+	vm->source_file = FS_VMLookup( name, interpret == VMI_NATIVE ? qfalse : qtrue, qfalse, &is_dll );
+#ifdef STEF_MARIO_MOD_FIX
+	Stef_MarioModFix_OnVMCreate( index, vm->source_file );
+#endif
+	if ( !vm->source_file ) {
+		return NULL;
+	}
+
+	if ( is_dll ) {
+		vm->dllHandle = FS_LoadGameDLL( vm->source_file, &vm->entryPoint, dllSyscalls );
+		if ( !vm->dllHandle ) {
+			return NULL;
+		}
+		vm->privateFlag = 0; // allow reading private cvars
+		vm->dataAlloc = ~0U;
+		vm->dataMask = ~0U;
+		vm->dataBase = 0;
+		return vm;
+	}
+
+	header = VM_LoadQVM( vm, qtrue );
+	if ( !header ) {
+		return NULL;
+	}
+#else
 	if ( interpret == VMI_NATIVE ) {
 		// try to load as a system dll
 		Com_Printf( "Loading dll file %s.\n", name );
@@ -1794,6 +1888,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	if( ( header = VM_LoadQVM( vm, qtrue ) ) == NULL ) {
 		return NULL;
 	}
+#endif
 
 	// allocate space for the jump targets, which will be filled in by the compile/prep functions
 	vm->instructionCount = header->instructionCount;

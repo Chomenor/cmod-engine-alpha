@@ -165,6 +165,16 @@ void EA_Attack(int client)
 
 	bi->actionflags |= ACTION_ATTACK;
 } //end of the function EA_Attack
+#ifdef ELITEFORCE
+void EA_AltAttack(int client)
+{
+	bot_input_t *bi;
+
+	bi = &botinputs[client];
+
+	bi->actionflags |= ACTION_ALTATTACK;
+} //end of the function EA_AltAttack
+#endif
 //===========================================================================
 //
 // Parameter:			-
@@ -205,7 +215,11 @@ void EA_Respawn(int client)
 
 	bi = &botinputs[client];
 
+#ifdef ELITEFORCE
+	bi->actionflags |= ACTION_ATTACK;
+#else
 	bi->actionflags |= ACTION_RESPAWN;
+#endif
 } //end of the function EA_Respawn
 //===========================================================================
 //

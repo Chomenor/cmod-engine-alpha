@@ -358,10 +358,12 @@ static LRESULT WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		}
 		else if ( wParam == CON_TIMER_ID && conTimerID != 0 && !com_errorEntered )
 		{
+#ifndef STEF_WINDOWS_CONSOLE_CRASH_FIX
 #ifdef DEDICATED
 			Com_Frame( qfalse );
 #else
 			//Com_Frame( CL_NoDelay() );
+#endif
 #endif
 		}
 		break;
@@ -449,10 +451,12 @@ static LRESULT WINAPI BufferWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 	case WM_TIMER:
 		if ( wParam == BUF_TIMER_ID && bufTimerID != 0 && !com_errorEntered )
 		{
+#ifndef STEF_WINDOWS_CONSOLE_CRASH_FIX
 #ifdef DEDICATED
 			Com_Frame( qfalse );
 #else
 			//Com_Frame( CL_NoDelay() );
+#endif
 #endif
 		}
 		if ( wParam == TEX_TIMER_ID && texTimerID != 0 ) {

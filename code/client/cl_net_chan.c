@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "client.h"
 
+#ifndef ELITEFORCE
 /*
 ==============
 CL_Netchan_Encode
@@ -128,6 +129,7 @@ static void CL_Netchan_Decode( msg_t *msg ) {
 		*(msg->data + i) = *(msg->data + i) ^ key;
 	}
 }
+#endif
 
 
 /*
@@ -153,6 +155,9 @@ CL_Netchan_Transmit
 ================
 */
 void CL_Netchan_Transmit( netchan_t *chan, msg_t* msg ) {
+#ifdef ELITEFORCE
+	if( !chan->compat )
+#endif
 	MSG_WriteByte( msg, clc_EOF );
 
 	if ( msg->overflowed ) {
@@ -162,8 +167,10 @@ void CL_Netchan_Transmit( netchan_t *chan, msg_t* msg ) {
 		Com_Error( ERR_DROP, "%s: message overflowed", __func__ );
 	}
 
+#ifndef ELITEFORCE
 	if ( chan->compat )
 		CL_Netchan_Encode( msg );
+#endif
 
 	Netchan_Transmit( chan, msg->cursize, msg->data );
 	
@@ -187,8 +194,10 @@ qboolean CL_Netchan_Process( netchan_t *chan, msg_t *msg ) {
 	if ( !ret )
 		return qfalse;
 
+#ifndef ELITEFORCE
 	if ( chan->compat )
 		CL_Netchan_Decode( msg );
+#endif
 
 	return qtrue;
 }

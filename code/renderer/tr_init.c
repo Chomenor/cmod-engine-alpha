@@ -61,6 +61,9 @@ cvar_t	*r_greyscale;
 static cvar_t *r_ignorehwgamma;
 
 cvar_t	*r_fastsky;
+#ifdef ELITEFORCE
+cvar_t	*r_origfastsky;
+#endif
 cvar_t	*r_neatsky;
 cvar_t	*r_drawSun;
 cvar_t	*r_dynamiclight;
@@ -595,6 +598,10 @@ static void InitOpenGL( void )
 			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", err );
 
 		R_InitExtensions();
+
+#ifdef ELITEFORCE
+		glConfig.textureFilterAnisotropicAvailable = textureFilterAnisotropic;
+#endif
 
 		gls.windowWidth = glConfig.vidWidth;
 		gls.windowHeight = glConfig.vidHeight;
@@ -1477,7 +1484,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fullbright, "Debugging tool to render the entire level without lighting." );
 	r_overBrightBits = ri.Cvar_Get( "r_overBrightBits", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_overBrightBits, "Sets the intensity of overall brightness of texture pixels." );
+#ifdef ELITEFORCE
+	r_mapOverBrightBits = ri.Cvar_Get ("r_mapOverBrightBits", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#else
 	r_mapOverBrightBits = ri.Cvar_Get( "r_mapOverBrightBits", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+#endif
 	ri.Cvar_SetDescription( r_mapOverBrightBits, "Sets the number of overbright bits baked into all lightmaps and map data." );
 	r_intensity = ri.Cvar_Get( "r_intensity", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_intensity, "1", "255", CV_FLOAT );
@@ -1550,6 +1561,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ignoreGLErrors, "Ignore OpenGL errors." );
 	r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fastsky, "Draw flat colored skies." );
+#ifdef ELITEFORCE
+	r_origfastsky = ri.Cvar_Get( "r_origfastsky", "0", CVAR_ARCHIVE_ND );
+#endif
 	r_drawSun = ri.Cvar_Get( "r_drawSun", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_drawSun, "Draw sun shader in skies." );
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
@@ -1742,7 +1756,11 @@ static void R_Register( void )
 	//
 	r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH | CVAR_DEVELOPER );
 	ri.Cvar_SetDescription( r_allowExtensions, "Use all of the OpenGL extensions your card is capable of." );
+#ifdef ELITEFORCE
+	r_ext_compressed_textures = ri.Cvar_Get( "r_ext_compress_textures", "0", CVAR_ARCHIVE | CVAR_LATCH );
+#else
 	r_ext_compressed_textures = ri.Cvar_Get( "r_ext_compressed_textures", "0", CVAR_ARCHIVE_ND | CVAR_LATCH | CVAR_DEVELOPER );
+#endif
 	ri.Cvar_SetDescription( r_ext_compressed_textures, "Enables texture compression." );
 	r_ext_multitexture = ri.Cvar_Get( "r_ext_multitexture", "1", CVAR_ARCHIVE_ND | CVAR_LATCH | CVAR_DEVELOPER );
 	ri.Cvar_SetDescription( r_ext_multitexture, "Enables hardware multi-texturing (0: off, 1: on)." );
@@ -1814,13 +1832,26 @@ void R_Init( void ) {
 	Com_Memset( &tess, 0, sizeof( tess ) );
 	Com_Memset( &glState, 0, sizeof( glState ) );
 
+#ifdef NEW_FILESYSTEM
+	tr.new_filesystem = ri.Cvar_VariableIntegerValue( "new_filesystem" ) ? qtrue : qfalse;
+#endif
+
+#ifdef ELITEFORCE
+	if ( sizeof( glconfig_t ) != 5192 )
+		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 5192", (unsigned int) sizeof( glconfig_t ) );
+#else
 	if ( sizeof( glconfig_t ) != 11332 )
 		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 11332", (unsigned int) sizeof( glconfig_t ) );
+#endif
 
 	if ( (intptr_t)tess.xyz & 15 ) {
 		ri.Printf( PRINT_WARNING, "tess.xyz not 16 byte aligned\n" );
 	}
 	Com_Memset( tess.constantColor255, 255, sizeof( tess.constantColor255 ) );
+
+#ifdef ELITEFORCE
+	R_NoiseInit();
+#endif
 
 	//
 	// init function tables
@@ -1840,6 +1871,9 @@ void R_Init( void ) {
 			tr.sawToothTable[i] = (float)i / FUNCTABLE_SIZE;
 		}
 		tr.inverseSawToothTable[i] = 1.0f - tr.sawToothTable[i];
+#ifdef ELITEFORCE
+		tr.noiseTable[i] = R_NoiseGet4f(0, 0, 0, i);
+#endif
 		if ( i < FUNCTABLE_SIZE / 2 ) {
 			if ( i < FUNCTABLE_SIZE / 4 ) {
 				if ( i == 0 ) {
@@ -1857,7 +1891,9 @@ void R_Init( void ) {
 
 	R_InitFogTable();
 
+#ifndef ELITEFORCE
 	R_NoiseInit();
+#endif
 
 	R_Register();
 
@@ -1993,6 +2029,9 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.RegisterSkin = RE_RegisterSkin;
 	re.RegisterShader = RE_RegisterShader;
 	re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
+#ifdef ELITEFORCE
+	re.RegisterShader3D = RE_RegisterShader3D;
+#endif
 	re.LoadWorld = RE_LoadWorldMap;
 	re.SetWorldVisData = RE_SetWorldVisData;
 	re.EndRegistration = RE_EndRegistration;

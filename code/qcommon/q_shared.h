@@ -26,6 +26,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
+#ifdef ELITEFORCE
+#define Q3_VERSION				"cMod v2.0 Alpha"
+#ifndef SVN_VERSION
+  #define SVN_VERSION Q3_VERSION
+#endif
+#define CLIENT_WINDOW_TITLE		"cMod Holomatch"
+#ifdef DEDICATED
+#define CONSOLE_WINDOW_TITLE	"cMod Holomatch Dedicated Server"
+#else
+#define CONSOLE_WINDOW_TITLE	"cMod Holomatch Console"
+#endif
+#define BASEGAME				"baseEF"
+
+#define MAX_MASTER_SERVERS      5	// number of supported master servers
+#define GAMENAME_FOR_MASTER		"EliteForce"
+#define HEARTBEAT_FOR_MASTER	"STEF1"
+#else
 #define Q3_VERSION            "Q3 1.32e"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
@@ -47,6 +64,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define GAMENAME_FOR_MASTER		"Quake3Arena"
 #define HEARTBEAT_FOR_MASTER	"QuakeArena-1"
+#endif
 
 #define DEMOEXT	"dm_"			// standard demo extension
 
@@ -1159,7 +1177,11 @@ typedef struct {
 #define	MAX_POWERUPS			16
 #define	MAX_WEAPONS				16		
 
+#ifdef ELITEFORCE
+#define MAX_PS_EVENTS			4
+#else
 #define	MAX_PS_EVENTS			2
+#endif
 
 #define PS_PMOVEFRAMECOUNTBITS	6
 
@@ -1183,6 +1205,11 @@ typedef struct playerState_s {
 	vec3_t		origin;
 	vec3_t		velocity;
 	int			weaponTime;
+#ifdef ELITEFORCE
+	int			rechargeTime;		// for the phaser
+	short		useTime;			// use debounce
+	int			introTime;			// for the holodoor
+#endif
 	int			gravity;
 	int			speed;
 	int			delta_angles[3];	// add to command angles to get view direction
@@ -1201,7 +1228,9 @@ typedef struct playerState_s {
 								// when at rest, the value will remain unchanged
 								// used to twist the legs during strafing
 
+#ifndef ELITEFORCE
 	vec3_t		grapplePoint;	// location of grapple to pull towards if PMF_GRAPPLE_PULL
+#endif
 
 	int			eFlags;			// copied to entityState_t->eFlags
 
@@ -1225,20 +1254,27 @@ typedef struct playerState_s {
 	int			damageYaw;
 	int			damagePitch;
 	int			damageCount;
+#ifdef ELITEFORCE
+	int			damageShieldCount;
+#endif
 
 	int			stats[MAX_STATS];
 	int			persistant[MAX_PERSISTANT];	// stats that aren't cleared on death
 	int			powerups[MAX_POWERUPS];	// level.time that the powerup runs out
 	int			ammo[MAX_WEAPONS];
 
+#ifndef ELITEFORCE
 	int			generic1;
 	int			loopSound;
 	int			jumppad_ent;	// jumppad entity hit this frame
+#endif
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
+#ifndef ELITEFORCE
 	int			pmove_framecount;	// FIXME: don't transmit over the network
 	int			jumppad_frame;
+#endif
 	int			entityEventSequence;
 } playerState_t;
 
@@ -1274,11 +1310,19 @@ typedef struct playerState_s {
 
 // usercmd_t is sent to the server each client frame
 typedef struct usercmd_s {
+#ifdef ELITEFORCE
+	int				serverTime;
+	byte			buttons;
+	byte			weapon;
+	int				angles[3];
+	signed char		forwardmove, rightmove, upmove;
+#else
 	int				serverTime;
 	int				angles[3];
 	int 			buttons;
 	byte			weapon;           // weapon 
 	signed char	forwardmove, rightmove, upmove;
+#endif
 } usercmd_t;
 
 //===================================================================
@@ -1351,7 +1395,9 @@ typedef struct entityState_s {
 	int		legsAnim;		// mask off ANIM_TOGGLEBIT
 	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
 
+#ifndef ELITEFORCE
 	int		generic1;
+#endif
 } entityState_t;
 
 typedef enum {

@@ -66,10 +66,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=1 USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
 
     - uses: actions/upload-artifact@v3.1.1
       if: matrix.cc == 'gcc' && matrix.btype == 'release'
@@ -85,22 +82,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x86, x64]
+        arch: [arm64]
         btype: [Release, Debug]
         include:
           - arch: arm64
             platform: ARM64
             suffix: .arm64
             pkg_suffix: arm64
-
-          - arch: x86
-            platform: Win32
-            pkg_suffix: x86
-
-          - arch: x64
-            platform: x64
-            suffix: .x64
-            pkg_suffix: x86_64
 
     steps:
 
@@ -116,19 +104,13 @@ jobs:
         mkdir bin
 
         msbuild code\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=quake3e.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }}
-        copy code\win32\msvc2017\output\quake3e.ded.exe bin\quake3e.ded${{ matrix.suffix }}.exe
+        copy code\win32\msvc2017\output\quake3e.ded.exe bin\cmod-alpha.ded${{ matrix.suffix }}.exe
         msbuild code\win32\msvc2017\quake3e-ded.vcxproj -p:TargetName=quake3e.ded,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
 
         msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }}
         msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0
-        copy code\win32\msvc2017\output\quake3e.exe bin\quake3e${{ matrix.suffix }}.exe
+        copy code\win32\msvc2017\output\quake3e.exe bin\cmod-alpha${{ matrix.suffix }}.exe
         msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
-
-        msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }}
-        msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0
-        copy code\win32\msvc2017\output\quake3e.exe bin\quake3e-vulkan${{ matrix.suffix }}.exe
-        msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }} -t:Clean
         msbuild code\win32\msvc2017\quake3e.vcxproj -p:TargetName=quake3e,Configuration=${{ matrix.btype }},Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
 
     - uses: actions/upload-artifact@v3.1.1
@@ -182,61 +164,10 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
       run: |
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }} 
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
 
     - uses: actions/upload-artifact@v3.1.1
       if: matrix.cc == 'gcc' && matrix.btype == 'release'
-      with:
-        name: linux-${{ matrix.arch }}
-        path: bin
-        if-no-files-found: error
-        retention-days: 5
-
-  ubuntu-arm:
-    name: ${{ matrix.btype }} Ubuntu [ARM] ${{ matrix.arch }}
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [aarch64, armv7]
-        cc: [gcc]
-        btype: [Release, Debug]
-        include:
-          - btype: Release
-            rule: install
-
-          - btype: Debug
-            rule: debug install
-
-    steps:
-
-    - uses: actions/checkout@v3.1.0
-      if: false
-      with:
-        submodules: recursive
-
-    - name: Build ${{ matrix.arch }}
-      #if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
-      if: false
-      uses: uraimo/run-on-arch-action@v2.0.5
-      with:
-        arch: ${{ matrix.arch }}
-        distro: ubuntu20.04
-        githubToken: ${{ github.token }}
-        shell: /bin/sh
-        run: |
-          apt-get -qq update
-          apt-get install -y make gcc g++
-          apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
-          make ${{ matrix.rule }} -j 4 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0
-          make clean ARCH=${{ matrix.arch }} 
-          make ${{ matrix.rule }} -j 4 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
-
-    - uses: actions/upload-artifact@v3.1.1
-      if: false
-      #if: matrix.cc == 'gcc' && matrix.btype == 'Release'
       with:
         name: linux-${{ matrix.arch }}
         path: bin
@@ -271,9 +202,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make ${{ matrix.rule }} -j 4 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=quake3e-vulkan BUILD_SERVER=0 STRIP=echo
-        make clean ARCH=${{ matrix.arch }} 
-        make ${{ matrix.rule }} -j 4 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl STRIP=echo
+        make ${{ matrix.rule }} -j 4 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl STRIP=echo
 
     - uses: actions/upload-artifact@v3.1.1
       if: matrix.cc == 'clang' && matrix.btype == 'release'
@@ -285,7 +214,7 @@ jobs:
 
   create-testing:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [windows-msys, windows-msvc, ubuntu-x86, ubuntu-arm, macos-x86]
+    needs: [windows-msys, windows-msvc, ubuntu-x86, macos-x86]
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
@@ -293,16 +222,12 @@ jobs:
 
       - name: Create binary archives
         run: |
-          7z a -r quake3e-linux-x86.zip           ./linux-x86/*
-          7z a -r quake3e-linux-x86_64.zip         ./linux-x86_64/*
-          7z a -r quake3e-windows-mingw-x86.zip    ./windows-mingw-x86/*
-          7z a -r quake3e-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
-          7z a -r quake3e-windows-msvc-x86.zip     ./windows-msvc-x86/*
-          7z a -r quake3e-windows-msvc-x86_64.zip  ./windows-msvc-x86_64/*
-          7z a -r quake3e-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
-          7z a -r quake3e-macos-x86_64.zip         ./macos-x86_64/*
-#         7z a -r quake3e-linux-aarch64.zip  ./linux-aarch64/*
-#         7z a -r quake3e-linux-armv7.zip    ./linux-armv7/*
+          7z a -r cmod-linux-x86.zip            ./linux-x86/*
+          7z a -r cmod-linux-x86_64.zip         ./linux-x86_64/*
+          7z a -r cmod-windows-mingw-x86.zip    ./windows-mingw-x86/*
+          7z a -r cmod-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
+          7z a -r cmod-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
+          7z a -r cmod-macos-x86_64.zip         ./macos-x86_64/*
 
       - name: Create latest build
         uses: marvinpinto/action-automatic-releases@latest
@@ -313,59 +238,3 @@ jobs:
           title: Latest Build
           files: |
             *.zip
-
-  update-release:
-    if: ${{ github.event_name == 'release' }}
-    needs: [windows-msys, windows-msvc, ubuntu-x86, ubuntu-arm, macos-x86]
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        include:
-          # - artifact_dir: linux-aarch64
-          #   artifact_name: quake3e-linux-aarch64.zip
-
-          # - artifact_dir: linux-armv7
-          #  artifact_name: quake3e-linux-armv7.zip
-
-          - artifact_dir: linux-x86
-            artifact_name: quake3e-linux-x86.zip
-
-          - artifact_dir: linux-x86_64
-            artifact_name: quake3e-linux-x86_64.zip
-
-          - artifact_dir: windows-mingw-x86
-#           artifact_name: quake3e-windows-mingw-x86.zip
-            artifact_name: quake3e-windows-x86.zip 
-
-          - artifact_dir: windows-mingw-x86_64
-#           artifact_name: quake3e-windows-mingw-x86_64.zip
-            artifact_name: quake3e-windows-x86_64.zip
-
-#         - artifact_dir: windows-msvc-x86
-#           artifact_name: quake3e-windows-msvc-x86.zip
-
-#         - artifact_dir: windows-msvc-x86_64
-#           artifact_name: quake3e-windows-msvc-x86_64.zip
-
-          - artifact_dir: windows-msvc-arm64
-#           artifact_name: quake3e-windows-msvc-arm64.zip
-            artifact_name: quake3e-windows-arm64.zip
-
-          - artifact_dir: macos-x86_64
-            artifact_name: quake3e-macos-x86_64.zip
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3.0.1
-
-      - name: Create archive
-        run: 7z a -r ${{ matrix.artifact_name }} ./${{ matrix.artifact_dir }}/*
-
-      - name: Upload archive
-        uses: "svenstaro/upload-release-action@latest"
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
-          overwrite: true
-          file: ${{ matrix.artifact_name }}

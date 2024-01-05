@@ -43,6 +43,7 @@ static void GetClientState( uiClientState_t *state ) {
 }
 
 
+#ifndef ELITEFORCE
 /*
 ====================
 LAN_LoadCachedServers
@@ -101,8 +102,10 @@ static void LAN_SaveServersToCache( void ) {
 
 	FS_FCloseFile(fileOut);
 }
+#endif
 
 
+#ifndef ELITEFORCE
 /*
 ====================
 LAN_ResetPings
@@ -224,6 +227,7 @@ static void LAN_RemoveServer(int source, const char *addr) {
 		}
 	}
 }
+#endif
 
 
 /*
@@ -279,6 +283,7 @@ static void LAN_GetServerAddressString( int source, int n, char *buf, int buflen
 }
 
 
+#ifndef ELITEFORCE
 /*
 ====================
 LAN_GetServerInfo
@@ -458,6 +463,7 @@ static int LAN_CompareServers( int source, int sortKey, int sortDir, int s1, int
 	}
 	return res;
 }
+#endif
 
 
 /*
@@ -500,6 +506,7 @@ static void LAN_GetPingInfo( int n, char *buf, int buflen ) {
 }
 
 
+#ifndef ELITEFORCE
 /*
 ====================
 LAN_MarkServerVisible
@@ -577,8 +584,10 @@ static int LAN_ServerIsVisible(int source, int n ) {
 	}
 	return qfalse;
 }
+#endif
 
 
+#ifndef ELITEFORCE
 /*
 =======================
 LAN_UpdateVisiblePings
@@ -597,6 +606,7 @@ LAN_GetServerStatus
 static int LAN_GetServerStatus( const char *serverAddress, char *serverStatus, int maxLen ) {
 	return CL_ServerStatus( serverAddress, serverStatus, maxLen );
 }
+#endif
 
 
 /*
@@ -658,6 +668,7 @@ static void Key_GetBindingBuf( int keynum, char *buf, int buflen ) {
 }
 
 
+#ifndef ELITEFORCE
 /*
 ====================
 CLUI_GetCDKey
@@ -678,6 +689,7 @@ static void CLUI_GetCDKey( char *buf, int buflen ) {
 	*buf = '\0';
 #endif
 }
+#endif
 
 
 /*
@@ -695,7 +707,12 @@ static void CLUI_SetCDKey( char *buf ) {
 		// set the flag so the flag will be written at the next opportunity
 		cvar_modifiedFlags |= CVAR_ARCHIVE;
 	} else {
+#ifdef ELITEFORCE
+		Com_Memcpy( cl_cdkey, buf, 22 );
+		cl_cdkey[22] = '\0';
+#else
 		Com_Memcpy( cl_cdkey, buf, 16 );
+#endif
 		// set the flag so the flag will be written at the next opportunity
 		cvar_modifiedFlags |= CVAR_ARCHIVE;
 	}
@@ -782,6 +799,12 @@ The ui module is making a system call
 ====================
 */
 static intptr_t CL_UISystemCalls( intptr_t *args ) {
+#ifdef STEF_VM_EXTENSIONS
+	intptr_t retval = 0;
+	if ( VMExt_HandleVMSyscall( args, VM_UI, uivm, VM_ArgPtr, &retval ) ) {
+		return retval;
+	}
+#endif
 	switch( args[0] ) {
 	case UI_ERROR:
 		Com_Error( ERR_DROP, "%s", (const char*)VMA(1) );
@@ -869,8 +892,10 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		FS_VM_CloseFile( args[1], H_Q3UI );
 		return 0;
 
+#ifndef ELITEFORCE
 	case UI_FS_SEEK:
 		return FS_VM_SeekFile( args[1], args[2], args[3], H_Q3UI );
+#endif
 
 	case UI_FS_GETFILELIST:
 		VM_CHECKBOUNDS( uivm, args[3], args[4] );
@@ -987,6 +1012,7 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		VM_CHECKBOUNDS( uivm, args[2], args[3] );
 		return GetConfigString( args[1], VMA(2), args[3] );
 
+#ifndef ELITEFORCE
 	case UI_LAN_LOADCACHEDSERVERS:
 		LAN_LoadCachedServers();
 		return 0;
@@ -1001,6 +1027,7 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_LAN_REMOVESERVER:
 		LAN_RemoveServer(args[1], VMA(2));
 		return 0;
+#endif
 
 	case UI_LAN_GETPINGQUEUECOUNT:
 		return LAN_GetPingQueueCount();
@@ -1019,6 +1046,20 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		LAN_GetPingInfo( args[1], VMA(2), args[3] );
 		return 0;
 
+#ifdef ELITEFORCE
+	case UI_LAN_GETLOCALSERVERCOUNT:
+		return LAN_GetServerCount(AS_LOCAL);
+
+	case UI_LAN_GETLOCALSERVERADDRESSSTRING:
+		LAN_GetServerAddressString( AS_LOCAL, args[1], VMA(2), args[3] );
+		return 0;
+	case UI_LAN_GETGLOBALSERVERCOUNT:
+		return LAN_GetServerCount(AS_GLOBAL);
+
+	case UI_LAN_GETGLOBALSERVERADDRESSSTRING:
+		LAN_GetServerAddressString( AS_GLOBAL, args[1], VMA(2), args[3] );
+		return 0;
+#else
 	case UI_LAN_GETSERVERCOUNT:
 		return LAN_GetServerCount(args[1]);
 
@@ -1055,27 +1096,35 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 
 	case UI_LAN_COMPARESERVERS:
 		return LAN_CompareServers( args[1], args[2], args[3], args[4], args[5] );
+#endif
 
 	case UI_MEMORY_REMAINING:
 		return Hunk_MemoryRemaining();
 
+#ifndef ELITEFORCE
 	case UI_GET_CDKEY:
 		VM_CHECKBOUNDS( uivm, args[1], args[2] );
 		CLUI_GetCDKey( VMA(1), args[2] );
 		return 0;
+#endif
 
 	case UI_SET_CDKEY:
 #ifndef STANDALONE
 		CLUI_SetCDKey( VMA(1) );
 #endif
+#ifdef ELITEFORCE
+		return qtrue;
+#endif
 		return 0;
 
+#ifndef ELITEFORCE
 	case UI_SET_PBCLSTATUS:
 		return 0;
 
 	case UI_R_REGISTERFONT:
 		re.RegisterFont( VMA(1), args[2], VMA(3));
 		return 0;
+#endif
 
 	// shared syscalls
 
@@ -1112,6 +1161,7 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_CEIL:
 		return FloatAsInt( ceil( VMF(1) ) );
 
+#ifndef ELITEFORCE
 	case UI_PC_ADD_GLOBAL_DEFINE:
 		return botlib_export->PC_AddGlobalDefine( VMA(1) );
 	case UI_PC_LOAD_SOURCE:
@@ -1157,6 +1207,7 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 
 	case UI_VERIFY_CDKEY:
 		return Com_CDKeyValidate(VMA(1), VMA(2));
+#endif
 
 	// engine extensions
 	case UI_R_ADDREFENTITYTOSCENE2:
@@ -1230,7 +1281,11 @@ CL_InitUI
 */
 #define UI_OLD_API_VERSION	4
 
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_InitUI, ( void ), (), "CLIENTSTATE" ) {
+#else
 void CL_InitUI( void ) {
+#endif
 	int		v;
 	vmInterpret_t		interpret;
 
@@ -1239,15 +1294,20 @@ void CL_InitUI( void ) {
 
 	// load the dll or bytecode
 	interpret = Cvar_VariableIntegerValue( "vm_ui" );
+#ifndef NEW_FILESYSTEM
 	if ( cl_connectedToPureServer )
 	{
 		// if sv_pure is set we only allow qvms to be loaded
 		if ( interpret != VMI_COMPILED && interpret != VMI_BYTECODE )
 			interpret = VMI_COMPILED;
 	}
+#endif
 
 	uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
 	if ( !uivm ) {
+#ifdef NEW_FILESYSTEM
+		{
+#else
 		if ( cl_connectedToPureServer && CL_GameSwitch() ) {
 			// server-side modification may require and reference only single custom ui.qvm
 			// so allow referencing everything until we download all files
@@ -1260,6 +1320,7 @@ void CL_InitUI( void ) {
 				Com_Error( ERR_DROP, "VM_Create on UI failed" );
 			}
 		} else {
+#endif
 			Com_Error( ERR_DROP, "VM_Create on UI failed" );
 		}
 	}
@@ -1270,6 +1331,9 @@ void CL_InitUI( void ) {
 //		Com_Printf(S_COLOR_YELLOW "WARNING: loading old Quake III Arena User Interface version %d\n", v );
 		// init for this gamestate
 		VM_Call( uivm, 1, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE) );
+#ifdef ELITEFORCE
+		Cvar_SetValue("ui_cdkeychecked2", 1);
+#endif
 	}
 	else if (v != UI_API_VERSION) {
 		// Free uivm now, so UI_SHUTDOWN doesn't get called later.
@@ -1282,17 +1346,24 @@ void CL_InitUI( void ) {
 	else {
 		// init for this gamestate
 		VM_Call( uivm, 1, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE) );
+#ifdef ELITEFORCE
+		Cvar_SetValue("ui_cdkeychecked2", 1);
+#endif
 	}
 }
 
 
 #ifndef STANDALONE
 qboolean UI_usesUniqueCDKey( void ) {
+#ifdef ELITEFORCE
+	return qfalse;
+#else
 	if (uivm) {
 		return (VM_Call( uivm, 0, UI_HASUNIQUECDKEY ) != 0);
 	} else {
 		return qfalse;
 	}
+#endif
 }
 #endif
 

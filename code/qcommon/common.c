@@ -34,7 +34,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../client/keys.h"
 
+#ifdef ELITEFORCE
+const int demo_protocols[] = { 24, 25, 26, 0 };
+#else
 const int demo_protocols[] = { 66, 67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
+#endif
 
 #define USE_MULTI_SEGMENT // allocate additional zone segments on demand
 
@@ -49,7 +53,11 @@ const int demo_protocols[] = { 66, 67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSIO
 #ifdef USE_MULTI_SEGMENT
 #define DEF_COMZONEMEGS		12
 #else
+#ifdef ELITEFORCE
+#define DEF_COMZONEMEGS		32
+#else
 #define DEF_COMZONEMEGS		25
+#endif
 #endif
 
 static jmp_buf abortframe;	// an ERR_DROP occurred, exit the entire frame
@@ -108,7 +116,11 @@ int		time_backend;		// renderer backend time
 
 static int	lastTime;
 int			com_frameTime;
+#ifdef NEW_FILESYSTEM
+int			com_frameNumber;
+#else
 static int	com_frameNumber;
+#endif
 
 qboolean	com_errorEntered = qfalse;
 qboolean	com_fullyInitialized = qfalse;
@@ -177,6 +189,20 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 	va_start( argptr, fmt );
 	len = Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 	va_end( argptr );
+
+#ifdef STEF_LUA_EVENTS
+	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+		// generate lua event with printlevel 2 (general print)
+		Stef_Lua_PushString( "text", msg );
+		Stef_Lua_PushInteger( "printlevel", 2 );
+		Stef_Lua_PushBoolean( "no_auto_newline", qtrue );
+		Stef_Lua_PushBoolean( "in_redirect", rd_buffer && !rd_flushing );
+		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+			// lua says it already handled console printing, so don't print again here
+			return;
+		}
+	}
+#endif
 
 	if ( rd_buffer && !rd_flushing ) {
 		if ( len + (int)strlen( rd_buffer ) > ( rd_buffersize - 1 ) ) {
@@ -268,6 +294,25 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 	va_end( argptr );
 
+#ifdef STEF_LUA_EVENTS
+	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+		// generate lua event with printlevel 1 (developer)
+		Stef_Lua_PushString( "text", msg );
+		Stef_Lua_PushInteger( "printlevel", 1 );
+		Stef_Lua_PushBoolean( "no_auto_newline", qtrue );
+		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+			// lua says it already handled console printing, so don't print again here
+			return;
+		}
+
+		// don't generate a duplicate event in Com_Printf
+		stef_lua_suppress_print_event = qtrue;
+		Com_Printf( S_COLOR_CYAN "%s", msg );
+		stef_lua_suppress_print_event = qfalse;
+		return;
+	}
+#endif
+
 	Com_Printf( S_COLOR_CYAN "%s", msg );
 }
 
@@ -286,6 +331,10 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	static int	errorCount;
 	static qboolean	calledSysError = qfalse;
 	int			currentTime;
+
+#ifdef STEF_LOGGING_DEFS
+	Logging_FrameEntry( "CLIENTSTATE", "Com_Error", -1, 0, qfalse );
+#endif
 
 #if defined(_WIN32) && defined(_DEBUG)
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
@@ -326,6 +375,12 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	va_start( argptr, fmt );
 	Q_vsnprintf( com_errorMessage, sizeof( com_errorMessage ), fmt, argptr );
 	va_end( argptr );
+
+#ifdef STEF_LOGGING_DEFS
+	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
+		Logging_RegisterCrash( "crash: %s", fmt );
+	}
+#endif
 
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		// we can't recover from ERR_FATAL so there is no recipients for com_errorMessage
@@ -427,7 +482,13 @@ void Com_Quit_f( void ) {
 #endif
 		VM_Forced_Unload_Done();
 		Com_Shutdown();
+#ifdef NEW_FILESYSTEM
+#ifdef DELAY_WRITECONFIG
+		Com_WriteConfiguration();
+#endif
+#else
 		FS_Shutdown( qtrue );
+#endif
 	}
 	Sys_Quit();
 }
@@ -818,6 +879,7 @@ qboolean Com_FilterExt( const char *filter, const char *name )
 }
 
 
+#ifndef NEW_FILESYSTEM
 /*
 ============
 Com_HasPatterns
@@ -837,6 +899,7 @@ qboolean Com_HasPatterns( const char *str )
 
 	return qfalse;
 }
+#endif
 
 
 /*
@@ -2163,6 +2226,7 @@ Com_InitHunkMemory
 static void Com_InitHunkMemory( void ) {
 	cvar_t	*cv;
 
+#ifndef NEW_FILESYSTEM
 	// make sure the file system has allocated and "not" freed any temp blocks
 	// this allows the config and product id files ( journal files too ) to be loaded
 	// by the file system without redundant routines in the file system utilizing different
@@ -2170,6 +2234,7 @@ static void Com_InitHunkMemory( void ) {
 	if ( FS_LoadStack() != 0 ) {
 		Com_Error( ERR_FATAL, "Hunk initialization failed. File system load stack not zero" );
 	}
+#endif
 
 	// allocate the stack based hunk allocator
 	cv = Cvar_Get( "com_hunkMegs", XSTRING( DEF_COMHUNKMEGS ), CVAR_LATCH | CVAR_ARCHIVE );
@@ -2982,8 +3047,22 @@ Com_ExecuteCfg
 For controlling environment variables
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( Com_ExecuteCfg, (void), (), "CLIENTSTATE" )
+#else
 static void Com_ExecuteCfg( void )
+#endif
 {
+#ifndef STEF_NO_DEDICATED_SERVER_AUTO_SETTINGS
+#ifdef NEW_FILESYSTEM
+	FS_ExecuteConfigFile("default.cfg", FS_CONFIGTYPE_DEFAULT, EXEC_APPEND, qfalse);
+	if(!Com_SafeMode()) {
+		// skip the q3config.cfg and autoexec.cfg if "safe" is on the command line
+		FS_ExecuteConfigFile(Q3CONFIG_CFG, FS_CONFIGTYPE_SETTINGS, EXEC_APPEND, qfalse);
+		FS_ExecuteConfigFile("autoexec.cfg", FS_CONFIGTYPE_SETTINGS, EXEC_APPEND, qfalse); }
+	Cbuf_Execute();
+	Com_Printf("\n");
+#else
 	Cbuf_ExecuteText(EXEC_NOW, "exec default.cfg\n");
 	Cbuf_Execute(); // Always execute after exec to prevent text buffer overflowing
 
@@ -2995,6 +3074,8 @@ static void Com_ExecuteCfg( void )
 		Cbuf_ExecuteText(EXEC_NOW, "exec autoexec.cfg\n");
 		Cbuf_Execute();
 	}
+#endif
+#endif
 }
 
 
@@ -3005,7 +3086,11 @@ Com_GameRestart
 Change to a new mod properly with cleaning up cvars before switching.
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( Com_GameRestart, (int checksumFeed, qboolean clientRestart), (checksumFeed, clientRestart), "CLIENTSTATE" )
+#else
 void Com_GameRestart( int checksumFeed, qboolean clientRestart )
+#endif
 {
 	static qboolean com_gameRestarting = qfalse;
 
@@ -3029,8 +3114,15 @@ void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 		// Reset console command history
 		Con_ResetHistory();
 
+#ifdef NEW_FILESYSTEM
+#ifdef DELAY_WRITECONFIG
+		// Write any pending config changes ahead of mod dir switch
+		Com_WriteConfiguration();
+#endif
+#else
 		// Shutdown FS early so Cvar_Restart will not reset old game cvars
 		FS_Shutdown( qtrue );
+#endif
 
 		// Clean out any user and VM created cvars
 		Cvar_Restart( qtrue );
@@ -3041,7 +3133,12 @@ void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 			CL_SystemInfoChanged( qfalse );
 #endif
 
+#ifdef NEW_FILESYSTEM
+		// Bring any pending changes to fs_game into effect
+		FS_UpdateModDir();
+#else
 		FS_Restart( checksumFeed );
+#endif
 
 		// Load new configuration
 		Com_ExecuteCfg();
@@ -3065,7 +3162,18 @@ Expose possibility to change current running mod to the user
 */
 static void Com_GameRestart_f( void )
 {
+#ifdef NEW_FILESYSTEM
+	// This will get sanitized in fs_set_mod_dir during the restart
 	Cvar_Set( "fs_game", Cmd_Argv( 1 ) );
+
+#ifndef DEDICATED
+	// Make sure the specified fs_game doesn't get overriden by cl_oldGame
+	extern qboolean cl_oldGameSet;
+	cl_oldGameSet = qfalse;
+#endif
+#else
+	Cvar_Set( "fs_game", Cmd_Argv( 1 ) );
+#endif
 
 	Com_GameRestart( 0, qtrue );
 }
@@ -3159,7 +3267,14 @@ void Com_ReadCDKey( const char *filename ) {
 	char			buffer[33];
 	char			fbuffer[MAX_OSPATH];
 
+#ifdef ELITEFORCE
+	int index = 0;
+	char curchar;
+
+	Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/efq3.key", filename );
+#else
 	Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/q3key", filename );
+#endif
 
 	FS_SV_FOpenFileRead( fbuffer, &f );
 	if ( f == FS_INVALID_HANDLE ) {
@@ -3169,6 +3284,59 @@ void Com_ReadCDKey( const char *filename ) {
 
 	Com_Memset( buffer, 0, sizeof( buffer ) );
 
+#ifdef ELITEFORCE
+	// check for the normal CD key
+	while(index < 16)
+	{
+		if(FS_Read(&curchar, 1, f) != 1)
+		{
+			Q_strncpyz( cl_cdkey, "                ", 17 );
+			FS_FCloseFile(f);
+			return;
+		}
+
+		curchar = toupper(curchar);
+
+		if(curchar < '0' || (curchar > '9' && curchar < 'A') || curchar > 'Z')
+			continue;
+
+		buffer[index] = toupper(curchar);
+
+		index++;
+	}
+	FS_FCloseFile(f);
+
+	// check for the expansion pack cd key
+	sprintf(fbuffer, "%s/expefq3.key", filename);
+	FS_SV_FOpenFileRead(fbuffer, &f);
+
+	if(f)
+	{
+		while(index < 32)
+		{
+			// same game
+
+			if(FS_Read(&curchar, 1, f) != 1)
+			{
+				Q_strncpyz( cl_cdkey, "                ", 17 );
+				FS_FCloseFile(f);
+				return;
+			}
+
+			curchar = toupper(curchar);
+
+			if(curchar < '0' || (curchar > '9' && curchar < 'A') || curchar > 'Z')
+				continue;
+
+			buffer[index] = toupper(curchar);
+
+			index++;
+		}
+		FS_FCloseFile(f);
+	}
+
+	Q_strncpyz(cl_cdkey, buffer, index+1);
+#else
 	FS_Read( buffer, 16, f );
 	FS_FCloseFile( f );
 
@@ -3177,6 +3345,7 @@ void Com_ReadCDKey( const char *filename ) {
 	} else {
 		Q_strncpyz( cl_cdkey, "                ", 17 );
 	}
+#endif
 }
 
 
@@ -3220,18 +3389,31 @@ Com_WriteCDKey
 static void Com_WriteCDKey( const char *filename, const char *ikey ) {
 	fileHandle_t	f;
 	char			fbuffer[MAX_OSPATH];
+#ifdef ELITEFORCE
+	char			key[23];
+#else
 	char			key[17];
+#endif
 #ifndef _WIN32
 	mode_t			savedumask;
 #endif
 
+#ifdef ELITEFORCE
+	Com_sprintf( fbuffer, sizeof(fbuffer), "%s/efq3.key", filename );
+#else
 	Com_sprintf( fbuffer, sizeof(fbuffer), "%s/q3key", filename );
+#endif
 
+#ifdef ELITEFORCE
+	Q_strncpyz( key, ikey, 23 );
+	key[22] = '\0';
+#else
 	Q_strncpyz( key, ikey, 17 );
 
 	if( !Com_CDKeyValidate(key, NULL) ) {
 		return;
 	}
+#endif
 
 #ifndef _WIN32
 	savedumask = umask(0077);
@@ -3242,7 +3424,11 @@ static void Com_WriteCDKey( const char *filename, const char *ikey ) {
 		goto out;
 	}
 
+#ifdef ELITEFORCE
+	FS_Write( key, strlen(key), f );
+#else
 	FS_Write( key, 16, f );
+#endif
 
 	FS_Printf( f, Q_NEWLINE "// generated by quake, do not modify" Q_NEWLINE );
 	FS_Printf( f, "// Do not give this file to ANYONE." Q_NEWLINE );
@@ -3757,6 +3943,10 @@ void Com_Init( char *commandLine ) {
 	Com_InitSmallZoneMemory();
 	Cvar_Init();
 
+#ifdef STEF_CVAR_DEFS
+	Stef_CvarDefsInit();
+#endif
+
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
 #endif
@@ -3799,8 +3989,13 @@ void Com_Init( char *commandLine ) {
 	Com_StartupVariable( "sv_master2" );
 	Com_StartupVariable( "sv_master3" );
 	Cvar_Get( "sv_master1", MASTER_SERVER_NAME, CVAR_INIT );
+#ifdef ELITEFORCE
+	Cvar_Get( "sv_master2", "efmaster.tjps.eu", CVAR_INIT );
+	Cvar_Get( "sv_master3", "", CVAR_INIT );
+#else
 	Cvar_Get( "sv_master2", "master.ioquake3.org", CVAR_INIT );
 	Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_INIT );
+#endif
 
 	com_protocol = Cvar_Get( "protocol", XSTRING( DEFAULT_PROTOCOL_VERSION ), 0 );
 	Cvar_SetDescription( com_protocol, "Specify network protocol version number, use -compat suffix for OpenArena compatibility.");
@@ -3820,7 +4015,15 @@ void Com_Init( char *commandLine ) {
 	// done early so bind command exists
 	Com_InitKeyCommands();
 
+#ifdef NEW_FILESYSTEM
+	FS_Startup();
+#else
 	FS_InitFilesystem();
+#endif
+
+#ifdef STEF_LUA_SUPPORT
+	Stef_Lua_Init();
+#endif
 
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_logfile, "0", "4", CV_INTEGER );
@@ -3837,6 +4040,10 @@ void Com_Init( char *commandLine ) {
 
 	// override anything from the config files with command line args
 	Com_StartupVariable( NULL );
+
+#ifdef NEW_FILESYSTEM
+	FS_ReadCache_Initialize();
+#endif
 
 	// get dedicated here for proper hunk megs initialization
 #ifdef DEDICATED
@@ -3920,6 +4127,11 @@ void Com_Init( char *commandLine ) {
 	Cvar_SetDescription( com_skipIdLogo, "Skip playing Id Software logo cinematic at startup." );
 #endif
 
+#ifdef ELITEFORCE
+	// Potentially used to identify ioEF engine in game modules/mods
+	Cvar_Get( "com_novmcompat", "1", CVAR_ROM );
+#endif
+
 	if ( com_dedicated->integer ) {
 		if ( !com_viewlog->integer ) {
 			Cvar_Set( "viewlog", "1" );
@@ -3990,6 +4202,7 @@ void Com_Init( char *commandLine ) {
 
 	// add + commands from command line
 	if ( !Com_AddStartupCommands() ) {
+#ifndef ELITEFORCE
 		// if the user didn't give any commands, run default action
 		if ( !com_dedicated->integer ) {
 #ifndef DEDICATED
@@ -4001,6 +4214,7 @@ void Com_Init( char *commandLine ) {
 			}
 #endif
 		}
+#endif
 	}
 
 #ifndef DEDICATED
@@ -4031,7 +4245,15 @@ void Com_Init( char *commandLine ) {
 static void Com_WriteConfigToFile( const char *filename ) {
 	fileHandle_t	f;
 
+#ifdef NEW_FILESYSTEM
+	if ( !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
+		f = FS_OpenSettingsFileWrite( Q3CONFIG_CFG );
+	} else {
+		f = FS_FOpenFileWrite( filename );
+	}
+#else
 	f = FS_FOpenFileWrite( filename );
+#endif
 	if ( f == FS_INVALID_HANDLE ) {
 		if ( !FS_ResetReadOnlyAttribute( filename ) || ( f = FS_FOpenFileWrite( filename ) ) == FS_INVALID_HANDLE ) {
 			Com_Printf( "Couldn't write %s.\n", filename );
@@ -4056,31 +4278,51 @@ Writes key bindings and archived cvars to config file if modified
 ===============
 */
 void Com_WriteConfiguration( void ) {
+#ifndef STEF_NO_DEDICATED_SERVER_AUTO_SETTINGS
 #ifndef DEDICATED
 	const char *basegame;
+#ifndef NEW_FILESYSTEM
 	const char *gamedir;
+#endif
 #endif
 	// if we are quitting without fully initializing, make sure
 	// we don't write out anything
 	if ( !com_fullyInitialized ) {
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf(LP_INFO, "CLIENTSTATE", "Com_WriteConfiguration: Skipping due to com_fullyInitialized");
+#endif
 		return;
 	}
 
 	if ( !(cvar_modifiedFlags & CVAR_ARCHIVE ) ) {
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf(LP_INFO, "CLIENTSTATE", "Com_WriteConfiguration: Skipping due to cvar_modifiedFlags");
+#endif
 		return;
 	}
 	cvar_modifiedFlags &= ~CVAR_ARCHIVE;
 
+#ifdef STEF_LOGGING_DEFS
+	Logging_Printf(LP_INFO, "CLIENTSTATE", "Com_WriteConfiguration: Writing config");
+#endif
+
 	Com_WriteConfigToFile( Q3CONFIG_CFG );
 
 #ifndef DEDICATED
+#ifdef NEW_FILESYSTEM
+	basegame = Cvar_VariableString( "fs_basegame" );
+	if (UI_usesUniqueCDKey() && Q_stricmp(FS_GetCurrentGameDir(), basegame)) {
+		Com_WriteCDKey( FS_GetCurrentGameDir(), &cl_cdkey[16] );
+#else
 	gamedir = Cvar_VariableString( "fs_game" );
 	basegame = Cvar_VariableString( "fs_basegame" );
 	if ( UI_usesUniqueCDKey() && gamedir[0] && Q_stricmp( basegame, gamedir ) ) {
 		Com_WriteCDKey( gamedir, &cl_cdkey[16] );
+#endif
 	} else {
 		Com_WriteCDKey( basegame, cl_cdkey );
 	}
+#endif
 #endif
 }
 
@@ -4094,7 +4336,9 @@ Write the config file to a specific name
 */
 static void Com_WriteConfig_f( void ) {
 	char	filename[MAX_QPATH];
+#ifndef NEW_FILESYSTEM
 	const char *ext;
+#endif
 
 	if ( Cmd_Argc() != 2 ) {
 		Com_Printf( "Usage: writeconfig <filename>\n" );
@@ -4104,10 +4348,12 @@ static void Com_WriteConfig_f( void ) {
 	Q_strncpyz( filename, Cmd_Argv(1), sizeof( filename ) );
 	COM_DefaultExtension( filename, sizeof( filename ), ".cfg" );
 
+#ifndef NEW_FILESYSTEM
 	if ( !FS_AllowedExtension( filename, qfalse, &ext ) ) {
 		Com_Printf( "%s: Invalid filename extension: '%s'.\n", __func__, ext );
 		return;
 	}
+#endif
 
 	Com_Printf( "Writing %s.\n", filename );
 	Com_WriteConfigToFile( filename );
@@ -4191,7 +4437,11 @@ static int Com_TimeVal( int minMsec )
 Com_Frame
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( Com_Frame, (qboolean noDelay), (noDelay), "CLIENTSTATE!-2" ) {
+#else
 void Com_Frame( qboolean noDelay ) {
+#endif
 
 #ifndef DEDICATED
 	static int bias = 0;
@@ -4207,7 +4457,14 @@ void Com_Frame( qboolean noDelay ) {
 	int	timeBeforeClient;
 	int	timeAfter;
 
+#ifdef STEF_LOGGING_DEFS
+	int logging_frame_count = Logging_FrameCount();
+#endif
+
 	if ( Q_setjmp( abortframe ) ) {
+#ifdef STEF_LOGGING_DEFS
+		Logging_FrameJump( logging_frame_count, "Com_Error" );
+#endif
 		return;			// an ERR_DROP was thrown
 	}
 
@@ -4420,6 +4677,10 @@ void Com_Frame( qboolean noDelay ) {
 		c_patch_traces = 0;
 		c_pointcontents = 0;
 	}
+
+#ifdef STEF_LUA_EVENTS
+	Stef_Lua_SimpleEventCall( STEF_LUA_EVENT_POST_FRAME );
+#endif
 
 	com_frameNumber++;
 }

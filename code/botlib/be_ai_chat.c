@@ -1682,6 +1682,7 @@ static void BotCheckInitialChatIntegrety(bot_chat_t *chat)
 		FreeMemory(s);
 	} //end for
 } //end of the function BotCheckInitialChatIntegrety
+#ifndef ELITEFORCE
 //===========================================================================
 //
 // Parameter:				-
@@ -1708,6 +1709,7 @@ static void BotCheckReplyChatIntegrety(bot_replychat_t *replychat)
 		FreeMemory(s);
 	} //end for
 } //end of the function BotCheckReplyChatIntegrety
+#endif
 #if 0
 //===========================================================================
 //
@@ -1795,6 +1797,7 @@ static void BotFreeReplyChat(bot_replychat_t *replychat)
 		FreeMemory(rp);
 	} //end for
 } //end of the function BotFreeReplyChat
+#ifndef ELITEFORCE
 //===========================================================================
 //
 // Parameter:			-
@@ -2062,6 +2065,7 @@ static bot_replychat_t *BotLoadReplyChat( const char *filename )
 	//
 	return replychatlist;
 } //end of the function BotLoadReplyChat
+#endif
 #if 0
 //===========================================================================
 //
@@ -2947,6 +2951,14 @@ void BotEnterChat(int chatstate, int clientto, int sendto)
 		}
 		else {
 			switch(sendto) {
+#ifdef ELITEFORCE
+				case CHAT_TEAM:
+					EA_Command(clientto, va("say_team %s", cs->chatmessage));
+					break;
+				default: //CHAT_ALL
+					EA_Command(clientto, va("say %s", cs->chatmessage));
+					break;
+#else
 				case CHAT_TEAM:
 					EA_Command(cs->client, va("say_team %s", cs->chatmessage));
 					break;
@@ -2956,6 +2968,7 @@ void BotEnterChat(int chatstate, int clientto, int sendto)
 				default: //CHAT_ALL
 					EA_Command(cs->client, va("say %s", cs->chatmessage));
 					break;
+#endif
 			}
 		}
 		//clear the chat message from the state
@@ -3005,13 +3018,19 @@ void BotSetChatGender(int chatstate, int gender)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
+#ifdef ELITEFORCE
+void BotSetChatName(int chatstate, const char *name)
+#else
 void BotSetChatName(int chatstate, const char *name, int client)
+#endif
 {
 	bot_chatstate_t *cs;
 
 	cs = BotChatStateFromHandle(chatstate);
 	if (!cs) return;
+#ifndef ELITEFORCE
 	cs->client = client;
+#endif
 	Q_strncpyz( cs->name, name, sizeof( cs->name ) );
 } //end of the function BotSetChatName
 //===========================================================================
@@ -3108,11 +3127,13 @@ int BotSetupChatAI(void)
 	file = LibVarString("matchfile", "match.c");
 	matchtemplates = BotLoadMatchTemplates(file);
 	//
+#ifndef ELITEFORCE
 	if (!LibVarValue("nochat", "0"))
 	{
 		file = LibVarString("rchatfile", "rchat.c");
 		replychats = BotLoadReplyChat(file);
 	} //end if
+#endif
 
 	InitConsoleMessageHeap();
 

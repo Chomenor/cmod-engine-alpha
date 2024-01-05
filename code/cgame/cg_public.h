@@ -131,6 +131,10 @@ typedef enum {
 	CG_SETUSERCMDVALUE,
 	CG_R_REGISTERSHADERNOMIP,
 	CG_MEMORY_REMAINING,
+#ifdef ELITEFORCE
+	CG_R_REGISTERSHADER3D,  //59
+	CG_CVAR_SET_NO_MODIFY,  // 60
+#else
 	CG_R_REGISTERFONT,
 	CG_KEY_ISDOWN,
 	CG_KEY_GETCATCHER,
@@ -170,6 +174,7 @@ typedef enum {
 	CG_STARTCAMERA,
 	CG_GETCAMERAINFO,
 */
+#endif
 
 	CG_FLOOR = 107,
 	CG_CEIL,
@@ -227,6 +232,7 @@ typedef enum {
 	CG_LAST_ATTACKER,
 //	int (*CG_LastAttacker)( void );
 
+#ifndef ELITEFORCE
 	CG_KEY_EVENT, 
 //	void	(*CG_KeyEvent)( int key, qboolean down );
 
@@ -235,6 +241,7 @@ typedef enum {
 
 	CG_EVENT_HANDLING,
 //	void (*CG_EventHandling)(int type);
+#endif
 
 	CG_EXPORT_LAST,
 } cgameExport_t;

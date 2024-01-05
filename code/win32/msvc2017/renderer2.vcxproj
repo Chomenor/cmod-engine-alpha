@@ -148,6 +148,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -194,6 +195,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -240,6 +242,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -290,6 +293,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -339,6 +343,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <WarningLevel>Level3</WarningLevel>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -388,6 +393,7 @@ cscript.exe /nologo glsl_stringify.vbs ..\..\renderer2\glsl\tonemap_vp.glsl .\bu
       <WarningLevel>Level3</WarningLevel>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>

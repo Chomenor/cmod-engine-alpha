@@ -179,10 +179,17 @@ void SCR_DrawSmallChar( int x, int y, int ch ) {
 	fcol = col*0.0625;
 	size = 0.0625;
 
+#ifdef ELITEFORCE
+	re.DrawStretchPic( x, y, smallchar_width, smallchar_height,
+					   fcol, frow,
+					   fcol + 0.03125, frow + size,
+					   cls.charSetShader );
+#else
 	re.DrawStretchPic( x, y, smallchar_width, smallchar_height,
 					   fcol, frow, 
 					   fcol + size, frow + size, 
 					   cls.charSetShader );
+#endif
 }
 
 
@@ -287,6 +294,17 @@ void SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noCol
 	color[3] = alpha;
 	SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, s, color, qfalse, noColorEscape );
 }
+
+#ifdef ELITEFORCE
+void SCR_DrawSmallStringEF(int x, int y, const char *s, float alpha)
+{
+	float   color[4];
+
+	color[0] = color[1] = color[2] = 1.0;
+	color[3] = alpha;
+	SCR_DrawSmallStringExt(x, y, s, color, qfalse, qfalse);
+}
+#endif
 
 
 /*

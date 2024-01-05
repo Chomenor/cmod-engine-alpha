@@ -929,6 +929,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	const shaderStage_t *pStage;
 	int tess_flags;
 	int stage, i;
+#ifdef ELITEFORCE
+	qboolean overridealpha = qfalse;
+	int oldalphaGen = 0;
+#endif
 
 #ifdef USE_VULKAN
 	uint32_t pipeline;
@@ -980,6 +984,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					R_ComputeTexCoords( i, &pStage->bundle[i] );
 				}
 				if ( tess_flags & ( TESS_RGBA0 << i ) ) {
+#ifdef ELITEFORCE
+					// Override the shader alpha channel if requested.
+					if (backEnd.currentEntity->e.renderfx & RF_FORCE_ENT_ALPHA)
+					{
+						overridealpha = qtrue;
+						oldalphaGen = pStage->bundle[i].alphaGen;
+						((shaderStage_t*)pStage)->bundle[i].alphaGen = AGEN_ENTITY;
+						R_ComputeColors(i, tess.svars.colors[i], pStage);
+						((shaderStage_t*)pStage)->bundle[i].alphaGen = oldalphaGen;
+					}
+					else
+#endif
 					R_ComputeColors( i, tess.svars.colors[i], pStage );
 				}
 				if ( tess_flags & (TESS_ENT0 << i) && backEnd.currentEntity ) {
@@ -1009,6 +1025,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		} else {
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
+
+#ifdef ELITEFORCE
+		// Placeholder hack
+		if (overridealpha && backEnd.currentEntity->e.shader.rgba[3] < 0xFF && !(pStage->stateBits & GLS_ATEST_BITS))
+		{
+			Vk_Pipeline_Def def = vk.pipelines[pipeline].def;
+			def.state_bits = (def.state_bits & ~(GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS | GLS_ATEST_BITS))  // remove the shader set values.
+				| GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_ATEST_GT_0; // Now add the default values.
+			pipeline = vk_find_pipeline_ext(0, &def, qfalse);
+		}
+#endif
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );

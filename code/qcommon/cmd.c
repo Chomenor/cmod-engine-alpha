@@ -325,10 +325,12 @@ Cmd_Exec_f
 */
 static void Cmd_Exec_f( void ) {
 	qboolean quiet;
+#ifndef NEW_FILESYSTEM
 	union {
 		char *c;
 		void *v;
 	} f;
+#endif
 	char filename[MAX_QPATH];
 
 	quiet = !Q_stricmp(Cmd_Argv(0), "execq");
@@ -341,6 +343,9 @@ static void Cmd_Exec_f( void ) {
 
 	Q_strncpyz( filename, Cmd_Argv(1), sizeof( filename ) );
 	COM_DefaultExtension( filename, sizeof( filename ), ".cfg" );
+#ifdef NEW_FILESYSTEM
+	FS_ExecuteConfigFile( filename, FS_CONFIGTYPE_NONE, EXEC_INSERT, quiet );
+#else
 	FS_BypassPure();
 	FS_ReadFile( filename, &f.v );
 	FS_RestorePure();
@@ -360,6 +365,7 @@ static void Cmd_Exec_f( void ) {
 #endif
 
 	FS_FreeFile( f.v );
+#endif
 }
 
 
@@ -870,6 +876,13 @@ void Cmd_ExecuteString( const char *text ) {
 	if ( !Cmd_Argc() ) {
 		return;		// no tokens
 	}
+
+#ifdef STEF_LUA_EVENTS
+	// check lua override
+	if ( Stef_Lua_SimpleEventCall( STEF_LUA_EVENT_CONSOLE_COMMAND ) ) {
+		return;
+	}
+#endif
 
 	// check registered command functions
 	for ( prev = &cmd_functions ; *prev ; prev = &cmd->next ) {

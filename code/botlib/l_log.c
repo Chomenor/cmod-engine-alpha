@@ -59,7 +59,11 @@ static logfile_t logfile;
 //===========================================================================
 void Log_Open( const char *filename )
 {
+#ifdef NEW_FILESYSTEM
+	char ospath[FS_MAX_PATH];
+#else
 	const char *ospath;
+#endif
 
 	if ( !LibVarValue( "log", "0" ) ) 
 		return;
@@ -76,7 +80,15 @@ void Log_Open( const char *filename )
 		return;
 	} //end if
 
+#ifdef NEW_FILESYSTEM
+	if ( !FS_GeneratePathWritedir( FS_GetCurrentGameDir(), filename, 0, 0, ospath, sizeof( ospath ) ) )
+	{
+		botimport.Print( PRT_ERROR, "can't create path for log file %s\n", filename );
+		return;
+	}
+#else
 	ospath = FS_BuildOSPath( Cvar_VariableString( "fs_homepath" ), "", filename );
+#endif
 	logfile.fp = Sys_FOpen( ospath, "wb" );
 	if ( !logfile.fp )
 	{

@@ -377,7 +377,11 @@ static const IMMNotificationClientVtbl notification_client_vtbl = {
 static NotificationClient_t notification_client = { &notification_client_vtbl, 1 };
 
 
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_SRET( qboolean, SNDDMA_InitWASAPI, (void), (), "SOUND" )
+#else
 static qboolean SNDDMA_InitWASAPI( void )
+#endif
 {
 	static byte				buffer[ 64 * 1024 ];
 	DWORD					dwStreamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -644,7 +648,11 @@ error1:
 }
 
 
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_SVOID( Done_WASAPI, (void), (), "SOUND" )
+#else
 static void Done_WASAPI( void )
+#endif
 {
 	inPlay = 0; // break mixer loop
 
@@ -713,7 +721,11 @@ static const char *DSoundError( int error ) {
 SNDDMA_Shutdown
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( SNDDMA_Shutdown, (void), (), "SOUND" ) {
+#else
 void SNDDMA_Shutdown( void ) {
+#endif
 	Com_DPrintf( "Shutting down sound system\n" );
 #if USE_WASAPI
 	if ( wasapi_init ) {
@@ -773,7 +785,11 @@ Initialize direct sound
 Returns false if failed
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( qboolean, SNDDMA_Init, (void), (), "SOUND" ) {
+#else
 qboolean SNDDMA_Init( void ) {
+#endif
 
 #if USE_WASAPI
 	const char *defdrv;
@@ -837,7 +853,11 @@ DEFINE_GUID(IID_IDirectSound8, 0xC50A7E93, 0xF395, 0x4834, 0x9E, 0xF6, 0x7F, 0xA
 DEFINE_GUID(IID_IDirectSound, 0x279AFA83, 0x4981, 0x11CE, 0xA5, 0x21, 0x00, 0x20, 0xAF, 0x0B, 0xE5, 0x60);
 
 
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( qboolean, SNDDMA_InitDS, (void), (), "SOUND" )
+#else
 static qboolean SNDDMA_InitDS( void )
+#endif
 {
 	HRESULT			hresult;
 	DSBUFFERDESC	dsbuf;

@@ -204,13 +204,18 @@ typedef struct {
 	int			downloadBlock;	// block we are waiting for
 	int			downloadCount;	// how many bytes we got
 	int			downloadSize;	// how many bytes we got
+#ifndef NEW_FILESYSTEM
 	char		downloadList[BIG_INFO_STRING]; // list of paks we need to download
+#endif
 	qboolean	downloadRestart;	// if true, we need to do another FS_Restart because we downloaded a pak
 
 #ifdef USE_CURL
 	qboolean	cURLEnabled;
 	qboolean	cURLUsed;
 	qboolean	cURLDisconnected;
+#ifdef NEW_FILESYSTEM
+	qboolean	cURLReconnecting;
+#endif
 	char		downloadURL[MAX_OSPATH];
 	CURL		*downloadCURL;
 	CURLM		*downloadCURLM;
@@ -538,6 +543,9 @@ void	SCR_DrawNamedPic( float x, float y, float width, float height, const char *
 
 void	SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noColorEscape );			// draws a string with embedded color control characters with fade
 void	SCR_DrawStringExt( int x, int y, float size, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );
+#ifdef ELITEFORCE
+void    SCR_DrawSmallStringEF( int x, int y, const char *s, float alpha );        // draws a string with embedded color control characters with fade
+#endif
 void	SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );
 void	SCR_DrawSmallChar( int x, int y, int ch );
 void	SCR_DrawSmallString( int x, int y, const char *s, int len );

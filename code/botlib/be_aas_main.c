@@ -217,6 +217,9 @@ void AAS_ProjectPointOntoVector( vec3_t point, vec3_t vStart, vec3_t vEnd, vec3_
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
+#ifdef STEF_LUA_SERVER
+qboolean SV_Lua_GetResourcePath( const char *type, char *buffer, unsigned int bufSize );
+#endif
 static int AAS_LoadFiles(const char *mapname)
 {
 	int errnum;
@@ -232,6 +235,21 @@ static int AAS_LoadFiles(const char *mapname)
 	AAS_LoadBSPFile();
 
 	//load the aas file
+#ifdef STEF_LUA_SERVER
+	{
+		char buffer[256];
+		SV_Lua_GetResourcePath( "aas", buffer, sizeof( buffer ) );
+		if ( *buffer ) {
+			errnum = AAS_LoadAASFile( buffer );
+			if (errnum != BLERR_NOERROR)
+				return errnum;
+
+			botimport.Print(PRT_MESSAGE, "loaded %s\n", buffer);
+			Q_strncpyz( aasworld.filename, buffer, sizeof( aasworld.filename ) );
+			return BLERR_NOERROR;
+		}
+	}
+#endif
 	Com_sprintf(aasfile, sizeof(aasfile), "maps/%s.aas", mapname);
 	errnum = AAS_LoadAASFile(aasfile);
 	if (errnum != BLERR_NOERROR)

@@ -179,6 +179,9 @@ struct vm_s {
 	//------------------------------------
 
 	const char	*name;				// module should be bare: "cgame", not "cgame.dll" or "vm/cgame.qvm"
+#ifdef NEW_FILESYSTEM
+	const fsc_file_t *source_file;		// Can be either qvm or dll
+#endif
 	vmIndex_t	index;
 
 	// for dynamic linked modules

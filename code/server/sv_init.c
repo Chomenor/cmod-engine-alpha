@@ -82,6 +82,15 @@ void SV_UpdateConfigstrings(client_t *client)
 {
 	int index;
 
+#ifdef STEF_LUA_SERVER
+	if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_UPDATE_CONFIGSTRING ) ) {
+		Stef_Lua_PushInteger( "client", client - svs.clients );
+		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+			return;
+		}
+	}
+#endif
+
 	for( index = 0; index < MAX_CONFIGSTRINGS; index++ ) {
 		// if the CS hasn't changed since we went to CS_PRIMED, ignore
 		if(!client->csUpdated[index])
@@ -115,6 +124,20 @@ void SV_SetConfigstring (int index, const char *val) {
 		val = "";
 	}
 
+#ifdef STEF_LUA_SERVER
+	if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_SET_CONFIGSTRING ) ) {
+		Stef_Lua_PushInteger( "index", index );
+		Stef_Lua_PushString( "value", val );
+		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+			// save value in engine for game module traps to access
+			if ( strcmp( val, sv.configstrings[index] ) ) {
+				Z_Free( sv.configstrings[index] );
+				sv.configstrings[index] = CopyString( val );
+			}
+		}
+	}
+#endif
+
 	// don't bother broadcasting an update if no change
 	if ( !strcmp( val, sv.configstrings[ index ] ) ) {
 		return;
@@ -143,6 +166,9 @@ void SV_SetConfigstring (int index, const char *val) {
 			SV_SendConfigstring(client, index);
 		}
 	}
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessConfigstring( index, val );
+#endif
 }
 
 
@@ -184,6 +210,9 @@ void SV_SetUserinfo( int index, const char *val ) {
 
 	Q_strncpyz( svs.clients[index].userinfo, val, sizeof( svs.clients[ index ].userinfo ) );
 	Q_strncpyz( svs.clients[index].name, Info_ValueForKey( val, "name" ), sizeof(svs.clients[index].name) );
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_USERINFO_CHANGED, index );
+#endif
 }
 
 
@@ -202,6 +231,20 @@ void SV_GetUserinfo( int index, char *buffer, int bufferSize ) {
 		Com_Error (ERR_DROP, "SV_GetUserinfo: bad index %i", index);
 	}
 	Q_strncpyz( buffer, svs.clients[ index ].userinfo, bufferSize );
+#ifdef STEF_BOT_PASSWORD_FIX
+	{
+		static cvar_t *passwordCvar;
+		if ( !passwordCvar ) {
+			passwordCvar = Cvar_Get( "g_password", "", 0 );
+		}
+		if ( passwordCvar && passwordCvar->string && passwordCvar->string[0] &&
+				Q_stricmp( passwordCvar->string, "none" ) &&
+				( svs.clients[index].netchan.remoteAddress.type == NA_BOT ||
+				svs.clients[index].netchan.remoteAddress.type == NA_LOOPBACK ) ) {
+			Info_SetValueForKey( buffer, "password", passwordCvar->string );
+		}
+	}
+#endif
 }
 
 
@@ -367,6 +410,10 @@ SV_ClearServer
 static void SV_ClearServer( void ) {
 	int i;
 
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_CLEAR_SERVER );
+#endif
+
 	for ( i = 0 ; i < MAX_CONFIGSTRINGS ; i++ ) {
 		if ( sv.configstrings[i] ) {
 			Z_Free( sv.configstrings[i] );
@@ -392,11 +439,18 @@ clients along with it.
 This is NOT called for map_restart
 ================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID(SV_SpawnServer, (const char *mapname, qboolean killBots), (mapname, killBots),
+		"SERVERSTATE CLIENTSTATE") {
+#else
 void SV_SpawnServer( const char *mapname, qboolean killBots ) {
+#endif
 	int			i;
 	int			checksum;
 	qboolean	isBot;
+#ifndef NEW_FILESYSTEM
 	const char	*p;
+#endif
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
@@ -406,6 +460,10 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Initializing server..." );
 
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_PRE_MAP_START );
+#endif
+
 #ifndef DEDICATED
 	// if not running a dedicated server CL_MapLoading will connect the client to the server
 	// also print some status stuff
@@ -413,6 +471,17 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// make sure all the client stuff is unloaded
 	CL_ShutdownAll();
+#endif
+
+#ifdef NEW_FILESYSTEM
+	// This is sometimes called in CL_MapLoading->CL_Disconnect, but not in the case
+	// of a previous local game, so do it here to be safe
+	FS_DisconnectCleanup();
+
+#ifdef DEDICATED
+	// Update mod directory in case fs_game was changed
+	FS_UpdateModDir();
+#endif
 #endif
 
 	// clear the whole hunk because we're (re)loading the server
@@ -437,10 +506,12 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 		}
 	}
 
+#ifndef NEW_FILESYSTEM
 #ifndef DEDICATED
 	// remove pure paks that may left from client-side
 	FS_PureServerSetLoadedPaks( "", "" );
 	FS_PureServerSetReferencedPaks( "", "" );
+#endif
 #endif
 
 	// clear pak references
@@ -456,10 +527,12 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// server has changed
 	svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
 
+#ifndef STEF_NO_ENGINE_NEXTMAP_SET
 	// set nextmap to the same map, but it may be overridden
 	// by the game startup or another console command
 	Cvar_Set( "nextmap", "map_restart 0" );
 //	Cvar_Set( "nextmap", va("map %s", server) );
+#endif
 
 	// try to reset level time if server is empty
 	if ( !sv_levelTimeReset->integer && !sv.restartTime ) {
@@ -499,10 +572,25 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// get a new checksum feed and restart the file system
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
+#ifndef NEW_FILESYSTEM
 	FS_Restart( sv.checksumFeed );
+#endif
 
 	Sys_SetStatus( "Loading map %s", mapname );
+#ifdef STEF_LUA_SERVER
+	{
+		char buffer[256];
+		SV_Lua_GetResourcePath( "bsp", buffer, sizeof( buffer ) );
+		if ( *buffer ) {
+			CM_LoadMap( buffer, qfalse, &checksum );
+			goto loaded;
+		}
+	}
+#endif
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
+#ifdef STEF_LUA_SERVER
+	loaded:
+#endif
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
@@ -598,6 +686,10 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	SV_BotFrame( sv.time );
 	svs.time += 100;
 
+#ifdef NEW_FILESYSTEM
+	// Set download and pure list cvars
+	FS_GenerateReferenceLists();
+#else
 	// we need to touch the cgame and ui qvm because they could be in
 	// separate pk3 files and the client will need to download the pk3
 	// files with the latest cgame and ui qvm to pass the pure check
@@ -651,6 +743,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 			}
 		}
 	}
+#endif
+
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_PRE_MAP_START_INFOCS );
+#endif
 
 	// save systeminfo and serverinfo strings
 	SV_SetConfigstring( CS_SYSTEMINFO, Cvar_InfoString_Big( CVAR_SYSTEMINFO, NULL ) );
@@ -668,6 +765,14 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	SV_Heartbeat_f();
 
 	Hunk_SetMark();
+
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_POST_MAP_START );
+#endif
+
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessMapLoaded();
+#endif
 
 	Com_Printf ("-----------------------------------\n");
 
@@ -706,11 +811,19 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_privateClients, "The number of spots, out of sv_maxclients, reserved for players with the server password (sv_privatePassword)." );
 	sv_hostname = Cvar_Get ("sv_hostname", "noname", CVAR_SERVERINFO | CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_hostname, "Sets the name of the server." );
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	sv_maxclients = Cvar_Get ("sv_maxclients", "32", CVAR_SERVERINFO | CVAR_LATCH);
+#else
 	sv_maxclients = Cvar_Get ("sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH);
+#endif
 	Cvar_CheckRange( sv_maxclients, "1", XSTRING(MAX_CLIENTS), CV_INTEGER );
 	Cvar_SetDescription( sv_maxclients, "Maximum number of people allowed to join the server dedicated server memory optimizations." );
 
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	sv_maxclientsPerIP = Cvar_Get( "sv_maxclientsPerIP", "5", CVAR_ARCHIVE );
+#else
 	sv_maxclientsPerIP = Cvar_Get( "sv_maxclientsPerIP", "3", CVAR_ARCHIVE );
+#endif
 	Cvar_CheckRange( sv_maxclientsPerIP, "1", NULL, CV_INTEGER );
 	Cvar_SetDescription( sv_maxclientsPerIP, "Limits number of simultaneous connections from the same IP address." );
 
@@ -718,7 +831,11 @@ void SV_Init( void )
 	Cvar_CheckRange( sv_clientTLD, NULL, NULL, CV_INTEGER );
 	Cvar_SetDescription( sv_clientTLD, "Client country detection code." );
 
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	sv_minRate = Cvar_Get( "sv_minRate", "25000", CVAR_ARCHIVE_ND | CVAR_SERVERINFO );
+#else
 	sv_minRate = Cvar_Get( "sv_minRate", "0", CVAR_ARCHIVE_ND | CVAR_SERVERINFO );
+#endif
 	Cvar_SetDescription( sv_minRate, "Minimum server bandwidth (in bit per second) a client can use." );
 	sv_maxRate = Cvar_Get( "sv_maxRate", "0", CVAR_ARCHIVE_ND | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_maxRate, "Maximum server bandwidth (in bit per second) a client can use." );
@@ -731,7 +848,11 @@ void SV_Init( void )
 	// systeminfo
 	Cvar_Get( "sv_cheats", "1", CVAR_SYSTEMINFO | CVAR_ROM );
 	sv_serverid = Cvar_Get( "sv_serverid", "0", CVAR_SYSTEMINFO | CVAR_ROM );
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	sv_pure = Cvar_Get( "sv_pure", "1", CVAR_SERVERINFO | CVAR_SYSTEMINFO | CVAR_LATCH );
+#else
 	sv_pure = Cvar_Get( "sv_pure", "1", CVAR_SYSTEMINFO | CVAR_LATCH );
+#endif
 	Cvar_SetDescription( sv_pure, "Requires clients to only get data from pk3 files the server is using." );
 	Cvar_Get( "sv_paks", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get( "sv_pakNames", "", CVAR_SYSTEMINFO | CVAR_ROM );
@@ -744,7 +865,15 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_rconPassword, "Password for remote server commands." );
 	sv_privatePassword = Cvar_Get ("sv_privatePassword", "", CVAR_TEMP );
 	Cvar_SetDescription( sv_privatePassword, "Set password for private clients to login with." );
+#ifdef ELITEFORCE
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	sv_fps = Cvar_Get ("sv_fps", "30", CVAR_SYSTEMINFO | CVAR_TEMP);
+#else
+	sv_fps = Cvar_Get ("sv_fps", "20", CVAR_SYSTEMINFO | CVAR_TEMP);
+#endif
+#else
 	sv_fps = Cvar_Get ("sv_fps", "20", CVAR_TEMP );
+#endif
 	Cvar_CheckRange( sv_fps, "10", "125", CV_INTEGER );
 	Cvar_SetDescription( sv_fps, "Set the max frames per second the server sends the client." );
 	sv_timeout = Cvar_Get( "sv_timeout", "200", CVAR_TEMP );
@@ -753,7 +882,11 @@ void SV_Init( void )
 	sv_zombietime = Cvar_Get( "sv_zombietime", "2", CVAR_TEMP );
 	Cvar_CheckRange( sv_zombietime, "1", NULL, CV_INTEGER );
 	Cvar_SetDescription( sv_zombietime, "Seconds to sink messages after disconnect." );
+#ifdef STEF_NO_ENGINE_NEXTMAP_SET
+	Cvar_Get ("nextmap", "map_restart 0", CVAR_TEMP );
+#else
 	Cvar_Get ("nextmap", "", CVAR_TEMP );
+#endif
 
 	sv_allowDownload = Cvar_Get ("sv_allowDownload", "1", CVAR_SERVERINFO);
 	Cvar_SetDescription( sv_allowDownload, "Toggle the ability for clients to download files maps etc. from server." );
@@ -785,7 +918,12 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_banFile, "Name of the file that is used for storing the server bans." );
 #endif
 
+#ifdef STEF_DEFAULT_SETTINGS_TWEAKS
+	// keep original behavior for bot join behavior and possibly map/mod compatibility
+	sv_levelTimeReset = Cvar_Get( "sv_levelTimeReset", "1", CVAR_ARCHIVE_ND );
+#else
 	sv_levelTimeReset = Cvar_Get( "sv_levelTimeReset", "0", CVAR_ARCHIVE_ND );
+#endif
 	Cvar_SetDescription( sv_levelTimeReset, "Whether or not to reset leveltime after new map loads." );
 
 	sv_filter = Cvar_Get( "sv_filter", "filter.txt", CVAR_ARCHIVE );
@@ -812,6 +950,9 @@ void SV_Init( void )
 	SV_TrackCvarChanges();
 
 	SV_InitChallenger();
+#ifdef STEF_SERVER_RECORD
+	Record_Initialize();
+#endif
 }
 
 
@@ -836,6 +977,11 @@ static void SV_FinalMessage( const char *message ) {
 				// don't send a disconnect to a local client
 				if ( cl->netchan.remoteAddress.type != NA_LOOPBACK ) {
 					SV_SendServerCommand( cl, "print \"%s\n\"\n", message );
+#ifdef ELITEFORCE
+					if(cl->compat)
+						SV_SendServerCommand(cl, "disconnect Server shutdown: %s", message);
+					else
+#endif
 					SV_SendServerCommand( cl, "disconnect \"%s\"", message );
 				}
 				// force a snapshot to be sent

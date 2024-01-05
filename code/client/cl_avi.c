@@ -376,14 +376,24 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 	{
 		char cmd[MAX_OSPATH * 4];
 		const char *cmd_fmt = "ffmpeg -f avi -i - -threads 0 -y %s \"%s\" 2> \"%s-log.txt\"";
+#ifdef NEW_FILESYSTEM
+		char ospath[FS_MAX_PATH];
+#else
 		const char *ospath;
+#endif
 
 		if ( !CL_ValidatePipeFormat( cl_aviPipeFormat->string ) ) {
 			Com_Printf( S_COLOR_YELLOW "Invalid pipe format: %s\n", cl_aviPipeFormat->string );
 			return qfalse;
 		}
 
+#ifdef NEW_FILESYSTEM
+		if ( !FS_GeneratePathWritedir( fileName, NULL, FS_CREATE_DIRECTORIES_FOR_FILE, 0, ospath, sizeof( ospath ) ) ) {
+			return qfalse;
+		}
+#else
 		ospath = FS_BuildOSPath( Cvar_VariableString( "fs_homepath" ), "", fileName );
+#endif
 		Com_sprintf( cmd, sizeof( cmd ), cmd_fmt, cl_aviPipeFormat->string, ospath, ospath );
 		if ( (afd.f = FS_PipeOpenWrite( cmd, fileName )) == FS_INVALID_HANDLE )
 			return qfalse;
@@ -714,7 +724,18 @@ qboolean CL_CloseAVI( qboolean reopen )
 	// Write index
 
 	// Open the temp index file
+#ifdef NEW_FILESYSTEM
+	indexSize = 0;
+	{
+		char path[FS_MAX_PATH];
+		if ( FS_GeneratePathWritedir( FS_GetCurrentGameDir(), idxFileName, 0, FS_ALLOW_DIRECTORIES, path, sizeof( path ) ) ) {
+			afd.idxF = FS_DirectReadHandle_Open( 0, path, (unsigned int *)&indexSize );
+		}
+	}
+	if ( indexSize <= 0 )
+#else
 	if ( ( indexSize = FS_Home_FOpenFileRead( idxFileName, &afd.idxF ) ) <= 0 )
+#endif
 	{
 		if ( afd.idxF != FS_INVALID_HANDLE ) 
 		{

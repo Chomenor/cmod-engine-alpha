@@ -113,6 +113,7 @@ qboolean Sys_RandomBytes( byte *string, int len )
 //============================================
 
 
+#ifndef NEW_FILESYSTEM
 // bk001129 - new in 1.26
 void Sys_ListFilteredFiles( const char *basedir, const char *subdirs, const char *filter, char **list, int *numfiles ) {
 	char	search[MAX_OSPATH*2+1];
@@ -293,6 +294,7 @@ void Sys_FreeFileList( char **list ) {
 
 	Z_Free( list );
 }
+#endif
 
 
 /*
@@ -484,13 +486,17 @@ Sys_LoadLibrary
 */
 void *Sys_LoadLibrary( const char *name )
 {
+#ifndef NEW_FILESYSTEM
 	const char *ext;
+#endif
 	void *handle;
 
+#ifndef NEW_FILESYSTEM
 	if ( FS_AllowedExtension( name, qfalse, &ext ) )
 	{
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
+#endif
 
 	handle = dlopen( name, RTLD_NOW );
 	return handle;

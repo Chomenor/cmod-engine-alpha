@@ -1238,7 +1238,11 @@ static void emit_cvtsi2ss( uint32_t xmmreg, uint32_t intreg )
 static void emit_cvttss2si( uint32_t intreg, uint32_t xmmreg )
 {
 	Emit1( 0xF3 );
+#ifdef STEF_VM_FLOAT_CAST_FIX
+	emit_op_reg( 0x0F, 0x2D, xmmreg, intreg );
+#else
 	emit_op_reg( 0x0F, 0x2C, xmmreg, intreg );
+#endif
 }
 
 static void emit_sqrt( uint32_t xmmreg, uint32_t base, int32_t offset )

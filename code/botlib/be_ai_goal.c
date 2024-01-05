@@ -379,7 +379,11 @@ static void InitLevelItemHeap(void)
 
 	if (levelitemheap) FreeMemory(levelitemheap);
 
+#ifdef ELITEFORCE
+	max_levelitems = (int) LibVarValue("max_levelitems", "1024");
+#else
 	max_levelitems = (int) LibVarValue("max_levelitems", "256");
+#endif
 	levelitemheap = (levelitem_t *) GetClearedMemory(max_levelitems * sizeof(levelitem_t));
 
 	for (i = 0; i < max_levelitems-1; i++)
@@ -1395,6 +1399,25 @@ int BotChooseLTGItem(int goalstate, vec3_t origin, int *inventory, int travelfla
 	//if no goal item found
 	if (!bestitem)
 	{
+#ifdef STEF_BOT_RANDOM_GOALS
+		// try to pick some random area here, otherwise bot might just get stuck
+		if (AAS_RandomGoalArea(areanum, travelflags, &goal.areanum, goal.origin))
+		{
+			VectorSet(goal.mins, -15, -15, -15);
+			VectorSet(goal.maxs, 15, 15, 15);
+			goal.entitynum = 0;
+			goal.number = 0;
+			goal.flags = GFL_ROAM;
+			goal.iteminfo = 0;
+			//push the goal on the stack
+			BotPushGoal(goalstate, &goal);
+			//
+#ifdef DEBUG
+			botimport.Print(PRT_MESSAGE, "chosen roam goal area %d\n", goal.areanum);
+#endif //DEBUG
+			return qtrue;
+		} //end if
+#else
 		/*
 		//if not in lava or slime
 		if (!AAS_AreaLava(areanum) && !AAS_AreaSlime(areanum))
@@ -1417,6 +1440,7 @@ int BotChooseLTGItem(int goalstate, vec3_t origin, int *inventory, int travelfla
 			} //end if
 		} //end if
 		*/
+#endif
 		return qfalse;
 	} //end if
 	//create a bot goal for this item

@@ -52,7 +52,11 @@ SV_EmitPacketEntities
 Writes a delta update of an entityState_t list to the message.
 =============
 */
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+static void SV_EmitPacketEntities( const clientSnapshot_t *from, const clientSnapshot_t *to, msg_t *msg, int maxEntityBaseline ) {
+#else
 static void SV_EmitPacketEntities( const clientSnapshot_t *from, const clientSnapshot_t *to, msg_t *msg ) {
+#endif
 	entityState_t	*oldent, *newent;
 	int		oldindex, newindex;
 	int		oldnum, newnum;
@@ -96,6 +100,15 @@ static void SV_EmitPacketEntities( const clientSnapshot_t *from, const clientSna
 
 		if ( newnum < oldnum ) {
 			// this is a new entity, send it from the baseline
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+			if ( newnum > maxEntityBaseline ) {
+				// Treat baselines excluded from gamestate as null
+				entityState_t null_baseline;
+				Com_Memset( &null_baseline, 0, sizeof( null_baseline ) );
+				MSG_WriteDeltaEntity( msg, &null_baseline, newent, qtrue );
+			}
+			else
+#endif
 			MSG_WriteDeltaEntity (msg, &sv.svEntities[newnum].baseline, newent, qtrue );
 			newindex++;
 			continue;
@@ -159,6 +172,9 @@ static void SV_WriteSnapshotToClient( const client_t *client, msg_t *msg ) {
 	// NOTE, MRE: now sent at the start of every message from server to client
 	// let the client know which reliable clientCommands we have received
 	//MSG_WriteLong( msg, client->lastClientCommand );
+#ifdef ELITEFORCE
+	if(msg->compat) MSG_WriteLong( msg, client->lastClientCommand );
+#endif
 
 	// send over the current server time so the client can drift
 	// its view of time to try to match
@@ -209,7 +225,11 @@ static void SV_WriteSnapshotToClient( const client_t *client, msg_t *msg ) {
 	}
 
 	// delta encode the entities
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+	SV_EmitPacketEntities (oldframe, frame, msg, client->maxEntityBaseline);
+#else
 	SV_EmitPacketEntities (oldframe, frame, msg);
+#endif
 
 	// padding for rate debugging
 	if ( sv_padPackets->integer ) {
@@ -423,6 +443,7 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 
 		// if it's a portal entity, add everything visible from its camera position
 		if ( ent->r.svFlags & SVF_PORTAL && !portal ) {
+#ifndef ELITEFORCE
 			if ( ent->s.generic1 ) {
 				vec3_t dir;
 				VectorSubtract(ent->s.origin, origin, dir);
@@ -430,17 +451,20 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 					continue;
 				}
 			}
+#endif
 			eNums->unordered = qtrue;
 			SV_AddEntitiesVisibleFromPoint( ent->s.origin2, frame, eNums, portal );
 		}
 	}
 
+#ifndef ELITEFORCE
 	ent = SV_GentityNum( frame->ps.clientNum );
 	// extension: merge second PVS at ent->r.s.origin2
 	if ( ent->r.svFlags & SVF_SELF_PORTAL2 && !portal ) {
 		SV_AddEntitiesVisibleFromPoint( ent->r.s.origin2, frame, eNums, qtrue );
 		eNums->unordered = qtrue;
 	}
+#endif
 }
 
 
@@ -719,11 +743,22 @@ void SV_SendClientSnapshot( client_t *client ) {
 		return;
 	}
 
+#ifdef ELITEFORCE
+	if(client->compat)
+	{
+		MSG_InitOOB(&msg, msg_buf, sizeof(msg_buf));
+		msg.compat = qtrue;
+	}
+	else
+#endif
 	MSG_Init( &msg, msg_buf, MAX_MSGLEN );
 	msg.allowoverflow = qtrue;
 
 	// NOTE, MRE: all server->client messages now acknowledge
 	// let the client know which reliable clientCommands we have received
+#ifdef ELITEFORCE
+	if(!client->compat)
+#endif
 	MSG_WriteLong( &msg, client->lastClientCommand );
 
 	// (re)send any reliable server commands
@@ -790,4 +825,7 @@ void SV_SendClientMessages( void )
 		c->lastSnapshotTime = svs.time;
 		c->rateDelayed = qfalse;
 	}
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessSnapshot();
+#endif
 }

@@ -208,6 +208,252 @@
     <ClCompile Include="..\win_qvk.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\eliteforce\stef_logging.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\stef_lua.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\stef_misc.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\vm_extensions.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\snd_codec_mp3.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\stef_common.c">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lctype.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ldblib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ldebug.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ldo.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ldump.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lfunc.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lgc.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\linit.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\liolib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\llex.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lmathlib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lmem.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\loadlib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lobject.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lopcodes.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\loslib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lparser.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lstate.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lstring.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lstrlib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ltable.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ltablib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\ltm.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lundump.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lutf8lib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lvm.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lzio.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lapi.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lauxlib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lbaselib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lcode.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\lua\lcorolib.c">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_stream.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_synth.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_timer.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_version.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_bit.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_decoder.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_fixed.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_frame.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_layer3.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_layer12.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\mad\mad_madhuffman.c">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_convert.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_main.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_spectator.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_writer.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_lua.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_misc.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_common.c">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_lookup.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_main.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_misc.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_reference.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_trusted_vms.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_commands.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_download.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_fileio.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fs_filelist.c">
+      <Filter>Source Files\filesystem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_iteration.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_main.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_md4.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_misc.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_os.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_pk3.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_sha256.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_shader.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_cache.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_crosshair.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\fscore\fsc_gameparse.c">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\inflate.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\inftrees.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\zutil.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\adler32.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\crc32.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\filesystem\zlib\inffast.c">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\game\bg_public.h">
@@ -297,6 +543,186 @@
     <ClInclude Include="..\glw_win.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\eliteforce\stef_config.h">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\stef_cvar_defs.h">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\stef_general.h">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\stef_logging.h">
+      <Filter>Source Files\eliteforce</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lctype.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\ldebug.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\ldo.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lfunc.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lgc.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\ljumptab.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\llex.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\llimits.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lmem.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lobject.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lopcodes.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lopnames.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lparser.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lprefix.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lstate.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lstring.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\ltable.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\ltm.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lua.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lua.hpp">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\luaconf.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lualib.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lundump.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lvm.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lzio.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\stef_interface.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lapi.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lauxlib.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\lua\lcode.h">
+      <Filter>Source Files\eliteforce\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\bit.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\config.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\decoder.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\fixed.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\frame.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\global.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\layer3.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\layer12.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\mad.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\madhuffman.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\stream.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\synth.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\timer.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\mad\version.h">
+      <Filter>Source Files\eliteforce\mad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\server\stef_sv_record_local.h">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\eliteforce\server\stef_sv_general.h">
+      <Filter>Source Files\eliteforce\server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\fslocal.h">
+      <Filter>Source Files\filesystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\fspublic.h">
+      <Filter>Source Files\filesystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\fscore\fscore.h">
+      <Filter>Source Files\filesystem\fscore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\inffast.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\inffixed.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\inflate.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\inftrees.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\zconf.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\zlib.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\zutil.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\filesystem\zlib\crc32.h">
+      <Filter>Source Files\filesystem\zlib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -307,6 +733,27 @@
     </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{bf7bfea2-5a49-4869-9d21-37c3952c7389}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\eliteforce">
+      <UniqueIdentifier>{0567f6d7-f25c-4d93-8a71-f49231c60090}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\eliteforce\lua">
+      <UniqueIdentifier>{32f2cf5a-b66d-4faf-a2b1-16558970d078}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\eliteforce\mad">
+      <UniqueIdentifier>{d8d037af-38af-4542-95f6-ee4bca3752c8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\eliteforce\server">
+      <UniqueIdentifier>{e39ea1c0-27eb-49f2-bcf0-54b8cde23189}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\filesystem">
+      <UniqueIdentifier>{f0a86d6e-31f4-489f-a0b5-5363904c3426}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\filesystem\fscore">
+      <UniqueIdentifier>{44fea677-65c6-4f20-a073-26f86dfbd882}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\filesystem\zlib">
+      <UniqueIdentifier>{ed4fb502-cf1a-4773-9a77-da07aabf2499}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

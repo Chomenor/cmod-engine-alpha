@@ -93,6 +93,15 @@ bit functions
 =============================================================================
 */
 
+#ifdef ELITEFORCE
+// Apparently, eliteforce only sends stuff like strings on 1 byte boundaries.
+void MSG_RoundBits(msg_t *msg)
+{
+	if(msg->bit & 0x07)
+		msg->bit = ++msg->readcount << 3;
+}
+#endif
+
 // negative bit values include signs
 void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 	int	i;
@@ -108,6 +117,40 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 		bits = -bits;
 	}
 	if (msg->oob) {
+#ifdef ELITEFORCE
+		if(msg->compat)
+		{
+			int write, leftover, nbits = bits, location;
+
+			// make sure to set all non-used space in value to zero.
+			if(bits < 32)
+				value &= ((1 << bits) - 1);
+
+			while(nbits)
+			{
+				leftover = msg->bit & 0x07;
+				write = 8 - leftover;
+				location = msg->bit >> 3;
+
+				if(write > nbits)
+					write = nbits;
+
+				if(location >= msg->maxsize) {
+					msg->overflowed = qtrue;
+					return; }
+
+				msg->data[location] &= (1 << leftover) - 1;
+				msg->data[location] |= (value & ((1 << write) - 1)) << (leftover);
+				nbits -= write;
+				value >>= write;
+				msg->bit += write;
+			}
+
+			msg->cursize = (msg->bit >> 3) + ((msg->bit & 0x07) ? 1 : 0);
+		}
+		else
+		{
+#endif
 		if ( bits == 8 ) {
 			msg->data[msg->cursize] = value;
 			msg->cursize += 1;
@@ -125,6 +168,9 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 		} else {
 			Com_Error(ERR_DROP, "can't write %d bits", bits);
 		}
+#ifdef ELITEFORCE
+		}
+#endif
 	} else {
 		value &= (0xffffffff>>(32-bits));
 		if ( bits & 7 ) {
@@ -172,6 +218,34 @@ static int MSG_ReadBits( msg_t *msg, int bits ) {
 	}
 
 	if ( msg->oob ) {
+#ifdef ELITEFORCE
+		if(msg->compat)
+		{
+			int get;
+			int nbits = 0;
+
+			while(nbits < bits)
+			{
+				i = msg->bit & 0x07;
+				get = 8 - i;
+
+				if(get > bits - nbits)
+					get = bits - nbits;
+
+				if((msg->bit >> 3) >= msg->cursize) {
+					msg->readcount = msg->cursize + 1;
+					return 0; }
+
+				value |= ((msg->data[msg->bit >> 3] >> i) & ((1 << get) - 1)) << nbits;
+				msg->bit += get;
+				nbits += get;
+			}
+
+			msg->readcount = (msg->bit >> 3) + ((msg->bit & 0x07) ? 1 : 0);
+		}
+		else
+		{
+#endif
 		if( bits == 8 )
 		{
 			value = *(buffer + msg->readcount);
@@ -194,6 +268,9 @@ static int MSG_ReadBits( msg_t *msg, int bits ) {
 		}
 		else
 			Com_Error( ERR_DROP, "can't read %d bits", bits );
+#ifdef ELITEFORCE
+		}
+#endif
 	} else {
 		const int nbits = bits & 7;
 		int bitIndex = msg->bit; // dereference optimization
@@ -254,6 +331,14 @@ void MSG_WriteByte( msg_t *sb, int c ) {
 
 void MSG_WriteData( msg_t *buf, const void *data, int length ) {
 	int i;
+#ifdef ELITEFORCE
+	if(buf->compat)
+	{
+		// Start writing on a whole-byte boundary
+		if(buf->bit & 0x07)
+			buf->bit = ++buf->cursize << 3;
+	}
+#endif
 	for(i=0;i<length;i++) {
 		MSG_WriteByte(buf, ((byte *)data)[i]);
 	}
@@ -289,11 +374,15 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 	}
 
 	for ( i = 0 ; i < l; i++ ) {
+#ifdef ELITEFORCE
+		v = s[i];
+#else
 		// get rid of 0x80+ and '%' chars, because old clients don't like them
 		if ( s[i] & 0x80 || s[i] == '%' )
 			v = '.';
 		else
 			v = s[i];
+#endif
 		MSG_WriteChar( sb, v );
 	}
 
@@ -311,11 +400,15 @@ void MSG_WriteBigString( msg_t *sb, const char *s ) {
 	}
 
 	for ( i = 0 ; i < l ; i++ ) {
+#ifdef ELITEFORCE
+		v = s[i];
+#else
 		// get rid of 0x80+ and '%' chars, because old clients don't like them
 		if ( s[i] & 0x80 || s[i] == '%' )
 			v = '.';
 		else
 			v = s[i];
+#endif
 		MSG_WriteChar( sb, v );
 	}
 
@@ -397,6 +490,11 @@ const char *MSG_ReadString( msg_t *msg ) {
 	static char	string[MAX_STRING_CHARS];
 	int	l, c;
 	
+#ifdef ELITEFORCE
+	if(msg->compat)
+		MSG_RoundBits(msg);
+#endif
+
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
@@ -407,10 +505,12 @@ const char *MSG_ReadString( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
+#ifndef ELITEFORCE
 		// don't allow higher ascii values
 		if ( c > 127 ) {
 			c = '.';
 		}
+#endif
 		string[ l++ ] = c;
 	} while ( qtrue );
 	
@@ -424,6 +524,11 @@ const char *MSG_ReadBigString( msg_t *msg ) {
 	static char	string[ BIG_INFO_STRING ];
 	int	l, c;
 	
+#ifdef ELITEFORCE
+	if(msg->compat)
+		MSG_RoundBits(msg);
+#endif
+
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
@@ -434,10 +539,12 @@ const char *MSG_ReadBigString( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
+#ifndef ELITEFORCE
 		// don't allow higher ascii values
 		if ( c > 127 ) {
 			c = '.';
 		}
+#endif
 		string[ l++ ] = c;
 	} while ( qtrue );
 	
@@ -451,6 +558,11 @@ const char *MSG_ReadStringLine( msg_t *msg ) {
 	static char	string[MAX_STRING_CHARS];
 	int	l, c;
 
+#ifdef ELITEFORCE
+	if(msg->compat)
+		MSG_RoundBits(msg);
+#endif
+
 	l = 0;
 	do {
 		c = MSG_ReadByte( msg ); // use ReadByte so -1 is out of bounds
@@ -461,10 +573,12 @@ const char *MSG_ReadStringLine( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
+#ifndef ELITEFORCE
 		// don't allow higher ascii values
 		if ( c > 127 ) {
 			c = '.';
 		}
+#endif
 		string[ l++ ] = c;
 	} while ( qtrue );
 	
@@ -481,6 +595,11 @@ float MSG_ReadAngle16( msg_t *msg ) {
 
 void MSG_ReadData( msg_t *msg, void *data, int len ) {
 	int		i;
+
+#ifdef ELITEFORCE
+	if(msg->compat)
+		MSG_RoundBits(msg);
+#endif
 
 	for (i=0 ; i<len ; i++) {
 		((byte *)data)[i] = MSG_ReadByte (msg);
@@ -530,6 +649,24 @@ delta functions with keys
 =============================================================================
 */
 
+#ifdef ELITEFORCE
+void MSG_WriteDelta( msg_t *msg, int oldV, int newV, int bits ) {
+	if ( oldV == newV ) {
+		MSG_WriteBits( msg, 0, 1 );
+		return;
+	}
+	MSG_WriteBits( msg, 1, 1 );
+	MSG_WriteBits( msg, newV, bits );
+}
+
+int	MSG_ReadDelta( msg_t *msg, int oldV, int bits ) {
+	if ( MSG_ReadBits( msg, 1 ) ) {
+		return MSG_ReadBits( msg, bits );
+	}
+	return oldV;
+}
+#endif
+
 static const int kbitmask[32] = {
 	0x00000001, 0x00000003, 0x00000007, 0x0000000F,
 	0x0000001F,	0x0000003F,	0x0000007F,	0x000000FF,
@@ -568,6 +705,61 @@ usercmd_t communication
 ============================================================================
 */
 
+#ifdef ELITEFORCE
+/*
+=====================
+MSG_WriteDeltaUsercmd
+=====================
+*/
+void MSG_WriteDeltaUsercmd( msg_t *msg, usercmd_t *from, usercmd_t *to ) {
+	if ( to->serverTime - from->serverTime < 256 ) {
+		MSG_WriteBits( msg, 1, 1 );
+		MSG_WriteBits( msg, to->serverTime - from->serverTime, 8 );
+	} else {
+		MSG_WriteBits( msg, 0, 1 );
+		MSG_WriteBits( msg, to->serverTime, 32 );
+	}
+	MSG_WriteDelta( msg, from->angles[0], to->angles[0], 16 );
+	MSG_WriteDelta( msg, from->angles[1], to->angles[1], 16 );
+	MSG_WriteDelta( msg, from->angles[2], to->angles[2], 16 );
+	MSG_WriteDelta( msg, from->forwardmove, to->forwardmove, 8 );
+	MSG_WriteDelta( msg, from->rightmove, to->rightmove, 8 );
+	MSG_WriteDelta( msg, from->upmove, to->upmove, 8 );
+#ifdef ELITEFORCE
+	MSG_WriteDelta( msg, from->buttons, to->buttons, 8 );
+#else
+	MSG_WriteDelta( msg, from->buttons, to->buttons, 16 );
+#endif
+	MSG_WriteDelta( msg, from->weapon, to->weapon, 8 );
+}
+
+
+/*
+=====================
+MSG_ReadDeltaUsercmd
+=====================
+*/
+void MSG_ReadDeltaUsercmd( msg_t *msg, const usercmd_t *from, usercmd_t *to ) {
+	if ( MSG_ReadBits( msg, 1 ) ) {
+		to->serverTime = from->serverTime + MSG_ReadBits( msg, 8 );
+	} else {
+		to->serverTime = MSG_ReadBits( msg, 32 );
+	}
+	to->angles[0] = MSG_ReadDelta( msg, from->angles[0], 16);
+	to->angles[1] = MSG_ReadDelta( msg, from->angles[1], 16);
+	to->angles[2] = MSG_ReadDelta( msg, from->angles[2], 16);
+	to->forwardmove = MSG_ReadDelta( msg, from->forwardmove, 8);
+	to->rightmove = MSG_ReadDelta( msg, from->rightmove, 8);
+	to->upmove = MSG_ReadDelta( msg, from->upmove, 8);
+#ifdef ELITEFORCE
+	to->buttons = MSG_ReadDelta( msg, from->buttons, 8);
+#else
+	to->buttons = MSG_ReadDelta( msg, from->buttons, 16);
+#endif
+	to->weapon = MSG_ReadDelta( msg, from->weapon, 8);
+}
+#endif
+
 /*
 =====================
 MSG_WriteDeltaUsercmdKey
@@ -600,7 +792,11 @@ void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, const
 	MSG_WriteDeltaKey( msg, key, from->forwardmove, to->forwardmove, 8 );
 	MSG_WriteDeltaKey( msg, key, from->rightmove, to->rightmove, 8 );
 	MSG_WriteDeltaKey( msg, key, from->upmove, to->upmove, 8 );
+#ifdef ELITEFORCE
+	MSG_WriteDeltaKey( msg, key, from->buttons, to->buttons, 8 );
+#else
 	MSG_WriteDeltaKey( msg, key, from->buttons, to->buttons, 16 );
+#endif
 	MSG_WriteDeltaKey( msg, key, from->weapon, to->weapon, 8 );
 }
 
@@ -630,7 +826,11 @@ void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, usercm
 		to->upmove = MSG_ReadDeltaKey( msg, key, from->upmove, 8);
 		if( to->upmove == -128 )
 			to->upmove = -127;
+#ifdef ELITEFORCE
+		to->buttons = MSG_ReadDeltaKey( msg, key, from->buttons, 8);
+#else
 		to->buttons = MSG_ReadDeltaKey( msg, key, from->buttons, 16);
+#endif
 		to->weapon = MSG_ReadDeltaKey( msg, key, from->weapon, 8);
 	} else {
 		to->angles[0] = from->angles[0];
@@ -651,6 +851,47 @@ entityState_t communication
   
 =============================================================================
 */
+
+#ifdef ELITEFORCE
+#define PVECTOR_BITS 5	// amount of bits we need to reference all predefined vectors.
+#define PVECTOR_BYTES 8	// length of predefined vector.
+#define PVECTOR_NUM (1 << PVECTOR_BITS) - 1 // number of existing predefined vectors.
+
+byte pVectors[PVECTOR_NUM][PVECTOR_BYTES] =
+{
+	{0x60, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x40, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x20, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x20, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x40, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0x80, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00},
+	{0x60, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00},
+	{0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0xe0, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00},
+	{0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x00, 0x10, 0x02, 0x00},
+	{0x60, 0x80, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00},
+	{0x60, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00},
+	{0xe1, 0x00, 0xc0, 0x01, 0x90, 0x00, 0x00, 0x00},
+	{0xed, 0x07, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00},
+	{0x60, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00},
+	{0x62, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00},
+	{0x02, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00},
+	{0xe0, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x60, 0x80, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00},
+};
+#endif
 
 /*
 =================
@@ -679,6 +920,58 @@ typedef struct {
 
 static const netField_t entityStateFields[] =
 {
+#ifdef ELITEFORCE
+{ NETF(eType), 8 },
+{ NETF(eFlags), 24 },
+{ NETF(pos.trType), 8 },
+{ NETF(pos.trTime), 32 },
+{ NETF(pos.trDuration), 32 },
+{ NETF(pos.trBase[0]), 0 },
+{ NETF(pos.trBase[1]), 0 },
+{ NETF(pos.trBase[2]), 0 },
+{ NETF(pos.trDelta[0]), 0 },
+{ NETF(pos.trDelta[1]), 0 },
+{ NETF(pos.trDelta[2]), 0 },
+{ NETF(apos.trType), 8 },
+{ NETF(apos.trTime), 32 },
+{ NETF(apos.trDuration), 32 },
+{ NETF(apos.trBase[0]), 0 },
+{ NETF(apos.trBase[1]), 0 },
+{ NETF(apos.trBase[2]), 0 },
+{ NETF(apos.trDelta[0]), 0 },
+{ NETF(apos.trDelta[1]), 0 },
+{ NETF(apos.trDelta[2]), 0 },
+{ NETF(time), 32 },
+{ NETF(time2), 32 },
+{ NETF(origin[0]), 0 },
+{ NETF(origin[1]), 0 },
+{ NETF(origin[2]), 0 },
+{ NETF(origin2[0]), 0 },
+{ NETF(origin2[1]), 0 },
+{ NETF(origin2[2]), 0 },
+{ NETF(angles[0]), 0 },
+{ NETF(angles[1]), 0 },
+{ NETF(angles[2]), 0 },
+{ NETF(angles2[0]), 0 },
+{ NETF(angles2[1]), 0 },
+{ NETF(angles2[2]), 0 },
+{ NETF(otherEntityNum), GENTITYNUM_BITS },
+{ NETF(otherEntityNum2), GENTITYNUM_BITS },
+{ NETF(groundEntityNum), GENTITYNUM_BITS },
+{ NETF(loopSound), 16 },
+{ NETF(constantLight), 32 },
+{ NETF(modelindex), 8 },
+{ NETF(modelindex2), 8 },
+{ NETF(frame), 16 },
+{ NETF(clientNum), 8 },
+{ NETF(solid), 24 },
+{ NETF(event), 10 },
+{ NETF(eventParm), 8 },
+{ NETF(powerups), 16 },
+{ NETF(weapon), 8 },
+{ NETF(legsAnim), 8 },
+{ NETF(torsoAnim), 8 },
+#else
 { NETF(pos.trTime), 32 },
 { NETF(pos.trBase[0]), 0 },
 { NETF(pos.trBase[1]), 0 },
@@ -730,6 +1023,7 @@ static const netField_t entityStateFields[] =
 { NETF(angles2[2]), 0 },
 { NETF(constantLight), 32 },
 { NETF(frame), 16 }
+#endif
 };
 
 
@@ -756,6 +1050,10 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 	int			trunc;
 	float		fullFloat;
 	const int	*fromF, *toF;
+#ifdef ELITEFORCE
+	byte		vector[PVECTOR_BYTES];
+	int			vectorIndex = -1;
+#endif
 
 	numFields = ARRAY_LEN( entityStateFields );
 
@@ -779,17 +1077,31 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 		Com_Error( ERR_DROP, "MSG_WriteDeltaEntity: Bad entity number: %i", to->number );
 	}
 
+#ifdef ELITEFORCE
+	if(msg->compat)
+		Com_Memset(vector, 0, sizeof(vector));
+#endif
+
 	lc = 0;
 	// build the change vector as bytes so it is endian independent
 	for ( i = 0, field = entityStateFields ; i < numFields ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 		if ( *fromF != *toF ) {
+#ifdef ELITEFORCE
+			if(msg->compat)
+				 vector[i >> 3] |= 1 << (i & 0x07);
+			else
+#endif
 			lc = i+1;
 		}
 	}
 
+#ifdef ELITEFORCE
+	if((msg->compat && !((int *) vector)[0] && !((int *) vector)[1]) || (!msg->compat && !lc)) {
+#else
 	if ( lc == 0 ) {
+#endif
 		// nothing at all changed
 		if ( !force ) {
 			return;		// nothing at all
@@ -801,21 +1113,63 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 		return;
 	}
 
+#ifdef ELITEFORCE
+	if(msg->compat)
+	{
+		for (i = 0; i < PVECTOR_NUM; i++)
+		{
+			if( ((int *) vector)[0] == ((int *)pVectors[i])[0] &&
+			    ((int *) vector)[1] == ((int *)pVectors[i])[1]
+			  )
+			{
+				vectorIndex = i;
+				break;
+			}
+		}
+	}
+#endif
+
 	MSG_WriteBits( msg, to->number, GENTITYNUM_BITS );
 	MSG_WriteBits( msg, 0, 1 );			// not removed
 	MSG_WriteBits( msg, 1, 1 );			// we have a delta
 
+#ifdef ELITEFORCE
+	if(msg->compat)
+	{
+		MSG_WriteBits(msg, vectorIndex, PVECTOR_BITS);
+
+		if (vectorIndex < 0)
+		{
+			for ( i = 0 ; i + 8 <= numFields ; i += 8 )
+				MSG_WriteByte( msg, vector[i >> 3] );
+			if ( numFields & 7 )
+				MSG_WriteBits( msg, vector[i >> 3], numFields & 7 );
+	        }
+
+	}
+	else
+#endif
 	MSG_WriteByte( msg, lc );	// # of changes
 
+#ifdef ELITEFORCE
+	for ( i = 0, field = entityStateFields ; msg->compat ? (i < numFields) : (i < lc) ; i++, field++ ) {
+#else
 	for ( i = 0, field = entityStateFields ; i < lc ; i++, field++ ) {
+#endif
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 
 		if ( *fromF == *toF ) {
+#ifdef ELITEFORCE
+			if(!msg->compat)
+#endif
 			MSG_WriteBits( msg, 0, 1 );	// no change
 			continue;
 		}
 
+#ifdef ELITEFORCE
+		if(!msg->compat)
+#endif
 		MSG_WriteBits( msg, 1, 1 );	// changed
 
 		if ( field->bits == 0 ) {
@@ -823,9 +1177,16 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 			fullFloat = *(const float *)toF;
 			trunc = (int)fullFloat;
 
+#ifdef ELITEFORCE
+			if(!msg->compat && fullFloat == 0.0f) {
+#else
 			if (fullFloat == 0.0f) {
+#endif
 				MSG_WriteBits( msg, 0, 1 );
 			} else {
+#ifdef ELITEFORCE
+				if(!msg->compat)
+#endif
 				MSG_WriteBits( msg, 1, 1 );
 				if ( trunc == fullFloat && trunc + FLOAT_INT_BIAS >= 0 && 
 					trunc + FLOAT_INT_BIAS < ( 1 << FLOAT_INT_BITS ) ) {
@@ -839,6 +1200,12 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 				}
 			}
 		} else {
+#ifdef ELITEFORCE
+			if(msg->compat)
+				MSG_WriteBits(msg, *toF, field->bits);
+			else
+			{
+#endif
 			if (*toF == 0) {
 				MSG_WriteBits( msg, 0, 1 );
 			} else {
@@ -846,6 +1213,9 @@ void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entitySt
 				// integer
 				MSG_WriteBits( msg, *toF, field->bits );
 			}
+#ifdef ELITEFORCE
+			}
+#endif
 		}
 	}
 }
@@ -871,6 +1241,11 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 	int			print;
 	int			trunc;
 	int			startBit, endBit;
+#ifdef ELITEFORCE
+	int			vectorIndex;
+	byte		vector_space[PVECTOR_BYTES];
+	byte		*vector = vector_space;
+#endif
 
 	if ( number < 0 || number >= MAX_GENTITIES ) {
 		Com_Error( ERR_DROP, "Bad delta entity number: %i", number );
@@ -902,6 +1277,10 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 	}
 
 	numFields = ARRAY_LEN( entityStateFields );
+#ifdef ELITEFORCE
+	if(msg->compat) lc = 0;
+	else
+#endif
 	lc = MSG_ReadByte(msg);
 
 	if ( lc > numFields || lc < 0 ) {
@@ -923,17 +1302,45 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 		print = 0;
 #endif
 
+#ifdef ELITEFORCE
+	if(msg->compat)
+	{
+		// Read in the vector index and check whether there is a predefined one or not.
+		vectorIndex = MSG_ReadBits( msg, PVECTOR_BITS );
+
+		if (vectorIndex == PVECTOR_NUM)
+		{
+			for (i = 0; i + 8 < numFields; i += 8)
+				vector[i >> 3] = MSG_ReadByte(msg);
+			if (numFields & 7)
+				vector[i>>3] = MSG_ReadBits( msg, numFields & 7 );
+		}
+		else
+			vector = pVectors[vectorIndex];
+	}
+
+	for ( i = 0, field = entityStateFields ; msg->compat ? (i < numFields) : (i < lc) ; i++, field++ ) {
+#else
 	for ( i = 0, field = entityStateFields ; i < lc ; i++, field++ ) {
+#endif
 		fromF = (const int *)( (const byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 
+#ifdef ELITEFORCE
+		if((msg->compat && ! (vector[i >> 3] & (1 << (i & 7)) )) || (!msg->compat && !MSG_ReadBits(msg, 1))) {
+#else
 		if ( ! MSG_ReadBits( msg, 1 ) ) {
+#endif
 			// no change
 			*toF = *fromF;
 		} else {
 			if ( field->bits == 0 ) {
 				// float
+#ifdef ELITEFORCE
+				if(!msg->compat && !MSG_ReadBits( msg, 1 )) {
+#else
 				if ( MSG_ReadBits( msg, 1 ) == 0 ) {
+#endif
 						*(float *)toF = 0.0f; 
 				} else {
 					if ( MSG_ReadBits( msg, 1 ) == 0 ) {
@@ -954,7 +1361,11 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 					}
 				}
 			} else {
+#ifdef ELITEFORCE
+				if(!msg->compat && !MSG_ReadBits(msg, 1)) {
+#else
 				if ( MSG_ReadBits( msg, 1 ) == 0 ) {
+#endif
 					*toF = 0;
 				} else {
 					// integer
@@ -967,12 +1378,19 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 //			pcount[i]++;
 		}
 	}
+#ifdef ELITEFORCE
+	if(!msg->compat)
+	{
+#endif
 	for ( i = lc, field = &entityStateFields[lc] ; i < numFields ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 		// no change
 		*toF = *fromF;
 	}
+#ifdef ELITEFORCE
+	}
+#endif
 
 	if ( print ) {
 		if ( msg->bit == 0 ) {
@@ -996,6 +1414,59 @@ plyer_state_t communication
 // using the stringizing operator to save typing...
 #define	PSF(x) #x,(size_t)&((playerState_t*)0)->x
 
+#ifdef ELITEFORCE
+static const netField_t playerStateFields[] =
+{
+{ PSF(commandTime), 32 },
+{ PSF(pm_type), 8 },
+{ PSF(bobCycle), 8 },
+{ PSF(pm_flags), 16 },
+{ PSF(pm_time), -16 },
+{ PSF(origin[0]), 0 },
+{ PSF(origin[1]), 0 },
+{ PSF(origin[2]), 0 },
+{ PSF(velocity[0]), 0 },
+{ PSF(velocity[1]), 0 },
+{ PSF(velocity[2]), 0 },
+{ PSF(weaponTime), -16 },
+{ PSF(gravity), 16 },
+{ PSF(speed), 16 },
+{ PSF(delta_angles[0]), 16 },
+{ PSF(delta_angles[1]), 16 },
+{ PSF(delta_angles[2]), 16 },
+{ PSF(groundEntityNum), GENTITYNUM_BITS },
+{ PSF(legsTimer), 8 },
+{ PSF(torsoTimer), 12 },
+{ PSF(legsAnim), 8 },
+{ PSF(torsoAnim), 8 },
+{ PSF(movementDir), 4 },
+{ PSF(eFlags), 16 },
+{ PSF(eventSequence), 16 },
+{ PSF(events[0]), 8 },
+{ PSF(events[1]), 8 },
+{ PSF(events[2]), 8 },
+{ PSF(events[3]), 8 },
+{ PSF(eventParms[0]), 8 },
+{ PSF(eventParms[1]), 8 },
+{ PSF(eventParms[2]), 8 },
+{ PSF(eventParms[3]), 8 },
+{ PSF(externalEvent), 10 },
+{ PSF(externalEventParm), 8 },
+{ PSF(clientNum), 8 },
+{ PSF(weapon), 5 },
+{ PSF(weaponstate), 4 },
+{ PSF(viewangles[0]), 0 },
+{ PSF(viewangles[1]), 0 },
+{ PSF(viewangles[2]), 0 },
+{ PSF(viewheight), -8 },
+{ PSF(damageEvent), 8 },
+{ PSF(damageYaw), 8 },
+{ PSF(damagePitch), 8 },
+{ PSF(damageCount), 8 },
+{ PSF(damageShieldCount), 8 },
+{ PSF(introTime), 32},
+};
+#else
 static const netField_t playerStateFields[] = 
 {
 { PSF(commandTime), 32 },
@@ -1047,6 +1518,7 @@ static const netField_t playerStateFields[] =
 { PSF(jumppad_ent), GENTITYNUM_BITS },
 { PSF(loopSound), 16 }
 };
+#endif
 
 /*
 =============
@@ -1074,6 +1546,10 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, const playerState_t *from, const pla
 	numFields = ARRAY_LEN( playerStateFields );
 
 	lc = 0;
+#ifdef ELITEFORCE
+	if(!msg->compat)
+	{
+#endif
 	for ( i = 0, field = playerStateFields ; i < numFields ; i++, field++ ) {
 		fromF = (const int *)( (byte *)from + field->offset );
 		toF = (const int *)( (byte *)to + field->offset );
@@ -1083,8 +1559,15 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, const playerState_t *from, const pla
 	}
 
 	MSG_WriteByte( msg, lc );	// # of changes
+#ifdef ELITEFORCE
+	}
+#endif
 
+#ifdef ELITEFORCE
+	for ( i = 0, field = playerStateFields ; msg->compat ? (i < numFields) : (i < lc) ; i++, field++ ) {
+#else
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
+#endif
 		fromF = (const int *)( (byte *)from + field->offset );
 		toF = (const int *)( (byte *)to + field->offset );
 
@@ -1146,10 +1629,17 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, const playerState_t *from, const pla
 		}
 	}
 
+#ifdef ELITEFORCE
+	if (!msg->compat && !statsbits && !persistantbits && !ammobits && !powerupbits) {
+#else
 	if (!statsbits && !persistantbits && !ammobits && !powerupbits) {
+#endif
 		MSG_WriteBits( msg, 0, 1 );	// no change
 		return;
 	}
+#ifdef ELITEFORCE
+	if(!msg->compat)
+#endif
 	MSG_WriteBits( msg, 1, 1 );	// changed
 
 	if ( statsbits ) {
@@ -1240,11 +1730,20 @@ void MSG_ReadDeltaPlayerstate( msg_t *msg, const playerState_t *from, playerStat
 #endif
 
 	numFields = ARRAY_LEN( playerStateFields );
+#ifdef ELITEFORCE
+	if(msg->compat)
+		lc = numFields;
+	else
+	{
+#endif
 	lc = MSG_ReadByte(msg);
 
 	if ( lc > numFields || lc < 0 ) {
 		Com_Error( ERR_DROP, "invalid playerState field count" );
 	}
+#ifdef ELITEFORCE
+	}
+#endif
 
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
 		fromF = (int *)( (byte *)from + field->offset );
@@ -1281,16 +1780,27 @@ void MSG_ReadDeltaPlayerstate( msg_t *msg, const playerState_t *from, playerStat
 			}
 		}
 	}
+#ifdef ELITEFORCE
+	if(!msg->compat)
+	{
+#endif
 	for ( i=lc,field = &playerStateFields[lc];i<numFields; i++, field++) {
 		fromF = (int *)( (byte *)from + field->offset );
 		toF = (int *)( (byte *)to + field->offset );
 		// no change
 		*toF = *fromF;
 	}
+#ifdef ELITEFORCE
+	}
+#endif
 
 
 	// read the arrays
+#ifdef ELITEFORCE
+	if(msg->compat || MSG_ReadBits( msg, 1 )) {
+#else
 	if (MSG_ReadBits( msg, 1 ) ) {
+#endif
 		// parse stats
 		if ( MSG_ReadBits( msg, 1 ) ) {
 			LOG("PS_STATS");

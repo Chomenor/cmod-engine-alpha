@@ -188,6 +188,9 @@ typedef enum {
 	GF_INVERSE_SAWTOOTH, 
 
 	GF_NOISE
+#ifdef ELITEFORCE
+	,GF_RANDOM
+#endif
 
 } genFunc_t;
 
@@ -982,7 +985,11 @@ void		R_Modellist_f (void);
 
 //====================================================
 
+#ifdef NEW_FILESYSTEM
+#define MAX_DRAWIMAGES 5000 // Increased limit to support large UI map selection menus
+#else
 #define	MAX_DRAWIMAGES			2048
+#endif
 #define	MAX_SKINS				1024
 
 
@@ -1159,6 +1166,10 @@ typedef struct {
 	qboolean				registered;		// cleared at shutdown, set at beginRegistration
 	qboolean				inited;			// cleared at shutdown, set at InitOpenGL
 
+#ifdef NEW_FILESYSTEM
+	qboolean				new_filesystem;		// use new filesystem calls
+#endif
+
 	int						visCount;		// incremented every time a new vis cluster is entered
 	int						frameCount;		// incremented every frame
 	int						sceneCount;		// incremented every scene
@@ -1252,6 +1263,9 @@ typedef struct {
 	float					triangleTable[FUNCTABLE_SIZE];
 	float					sawToothTable[FUNCTABLE_SIZE];
 	float					inverseSawToothTable[FUNCTABLE_SIZE];
+#ifdef ELITEFORCE
+	float					noiseTable[FUNCTABLE_SIZE];
+#endif
 	float					fogTable[FOG_TABLE_SIZE];
 
 	qboolean				mapLoading;
@@ -1405,6 +1419,10 @@ extern	cvar_t	*r_printShaders;
 extern cvar_t	*r_marksOnTriangleMeshes;
 
 //====================================================================
+
+#ifdef ELITEFORCE
+int R_RandomOn( float t );
+#endif
 
 void R_SwapBuffers( int );
 

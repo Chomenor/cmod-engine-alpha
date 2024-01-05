@@ -282,6 +282,12 @@ static genFunc_t NameToGenFunc( const char *funcname )
 	{
 		return GF_NOISE;
 	}
+#ifdef ELITEFORCE
+	else if( !Q_stricmp( funcname, "random" ) )
+	{
+		return GF_RANDOM;
+	}
+#endif
 
 	ri.Printf( PRINT_WARNING, "WARNING: invalid genfunc name '%s' in shader '%s'\n", funcname, shader.name );
 	return GF_SIN;
@@ -805,6 +811,12 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			{
 				depthFuncBits = 0;
 			}
+#ifdef ELITEFORCE
+			else if ( !Q_stricmp( token, "disable" ) )
+			{
+				depthFuncBits = 0;
+			}
+#endif
 			else if ( !Q_stricmp( token, "equal" ) )
 			{
 				depthFuncBits = GLS_DEPTHFUNC_EQUAL;
@@ -3095,6 +3107,10 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	char		strippedName[MAX_QPATH];
 	unsigned long hash;
 	const char	*shaderText;
+#ifdef NEW_FILESYSTEM
+	const fsc_shader_t *fsShader;
+	char		*shaderTextToFree = NULL;
+#endif
 	image_t		*image;
 	shader_t	*sh;
 
@@ -3141,6 +3157,12 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	//
 	// attempt to define shader from an explicit parameter file
 	//
+#ifdef NEW_FILESYSTEM
+	if ( tr.new_filesystem ) {
+		fsShader = ri.FS_ShaderLookup( strippedName, 0, qfalse );
+		shaderText = shaderTextToFree = fsShader ? ri.FS_ReadShader( fsShader ) : NULL;
+	} else
+#endif
 	shaderText = FindShaderInShaderText( strippedName );
 	if ( shaderText ) {
 		// enable this when building a pak file to get a global list
@@ -3153,6 +3175,12 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 			// had errors, so use default shader
 			shader.defaultShader = qtrue;
 		}
+
+#ifdef NEW_FILESYSTEM
+		if ( tr.new_filesystem ) {
+			ri.Free( shaderTextToFree );
+		}
+#endif
 
 		return FinishShader();
 	}
@@ -3339,6 +3367,38 @@ qhandle_t RE_RegisterShaderNoMip( const char *name ) {
 
 	return sh->index;
 }
+
+#ifdef ELITEFORCE
+/*
+====================
+RE_RegisterShader3D
+
+For explicitly defined shaders that need LIGHTMAP_NONE
+as lightmapIndex.
+====================
+*/
+qhandle_t RE_RegisterShader3D( const char *name ) {
+	shader_t	*sh;
+
+	if ( strlen( name ) >= MAX_QPATH ) {
+		Com_Printf( "Shader name exceeds MAX_QPATH\n" );
+		return 0;
+	}
+
+	sh = R_FindShader( name, LIGHTMAP_NONE, qfalse );
+
+	// we want to return 0 if the shader failed to
+	// load for some reason, but R_FindShader should
+	// still keep a name allocated for it, so if
+	// something calls RE_RegisterShader again with
+	// the same name, we don't try looking for it again
+	if ( sh->defaultShader ) {
+		return 0;
+	}
+
+	return sh->index;
+}
+#endif
 
 /*
 ====================
@@ -3740,6 +3800,9 @@ void R_InitShaders( void ) {
 
 	CreateInternalShaders();
 
+#ifdef NEW_FILESYSTEM
+	if ( !tr.new_filesystem )
+#endif
 	ScanAndLoadShaderFiles();
 
 	CreateExternalShaders();

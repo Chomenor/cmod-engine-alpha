@@ -115,6 +115,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -128,6 +129,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -140,6 +142,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -157,6 +160,7 @@
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -174,6 +178,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>
@@ -191,6 +196,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Lib>
       <OutputFile>$(OutDir)$(ConfigurationName)-$(PlatformName)-$(TargetName).lib</OutputFile>

@@ -209,6 +209,10 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 	// get the reliable sequence acknowledge number
 	// NOTE: now sent with all server to client messages
 	//clc.reliableAcknowledge = MSG_ReadLong( msg );
+#ifdef ELITEFORCE
+	if ( msg->compat )
+		clc.reliableAcknowledge = MSG_ReadLong( msg );
+#endif
 
 	// read in the new snapshot to a temporary buffer
 	// we will only copy to cl.snap if it is valid
@@ -340,11 +344,19 @@ new information out of it.  This will happen at every
 gamestate, and possibly during gameplay.
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_SystemInfoChanged, (qboolean onlyGame), (onlyGame), "CLIENTSTATE" ) {
+#else
 void CL_SystemInfoChanged( qboolean onlyGame ) {
+#endif
 	const char		*systemInfo;
 	const char		*s, *t;
 	char			key[BIG_INFO_KEY];
 	char			value[BIG_INFO_VALUE];
+
+#ifdef STEF_LOGGING_DEFS
+	Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: onlyGame(%i)", onlyGame );
+#endif
 
 	systemInfo = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SYSTEMINFO ];
 	// NOTE TTimo:
@@ -352,6 +364,9 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=475
 	// in some cases, outdated cp commands might get sent with this news serverId
 	cl.serverId = atoi( Info_ValueForKey( systemInfo, "sv_serverid" ) );
+#ifdef STEF_LOGGING_DEFS
+	Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: cl.serverId set to %i", cl.serverId );
+#endif
 
 	// don't set any vars when playing a demo
 	if ( clc.demoplaying ) {
@@ -360,13 +375,23 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 
 	s = Info_ValueForKey( systemInfo, "sv_pure" );
 	cl_connectedToPureServer = atoi( s );
+#ifdef NEW_FILESYSTEM
+	FS_SetConnectedServerPureValue( cl_connectedToPureServer );
+#endif
 
 	// parse/update fs_game in first place
 	s = Info_ValueForKey( systemInfo, "fs_game" );
 
+#ifdef NEW_FILESYSTEM
+	{
+#else
 	if ( FS_InvalidGameDir( s ) ) {
 		Com_Printf( S_COLOR_YELLOW "WARNING: Server sent invalid fs_game value %s\n", s );
 	} else {
+#endif
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: fs_game set to '%s'", s );
+#endif
 		Cvar_Set( "fs_game", s );
 	}
 
@@ -375,11 +400,16 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 		Cvar_Set( "fs_game", "" );
 	}
 
+#ifndef NEW_FILESYSTEM
 	if ( onlyGame && Cvar_Flags( "fs_game" ) & CVAR_MODIFIED ) {
 		// game directory change is needed
 		// return early to avoid systeminfo-cvar pollution in current fs_game
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: early return due to onlyGame + fs_game modified", s );
+#endif
 		return;
 	}
+#endif
 
 	if ( CL_GameSwitch() ) {
 		// we just restored fs_game from saved systeminfo
@@ -396,7 +426,11 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 	if ( com_sv_running->integer ) {
 		// no filesystem restrictions for localhost
 		FS_PureServerSetLoadedPaks( "", "" );
+#ifdef NEW_FILESYSTEM
+		FS_RegisterDownloadList( "", "" );
+#else
 		FS_PureServerSetReferencedPaks( "", "" );
+#endif
 	} else {
 		// check pure server string
 		s = Info_ValueForKey( systemInfo, "sv_paks" );
@@ -405,8 +439,23 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 
 		s = Info_ValueForKey( systemInfo, "sv_referencedPaks" );
 		t = Info_ValueForKey( systemInfo, "sv_referencedPakNames" );
+#ifdef NEW_FILESYSTEM
+		FS_RegisterDownloadList( s, t );
+#else
 		FS_PureServerSetReferencedPaks( s, t );
+#endif
 	}
+
+#ifdef NEW_FILESYSTEM
+	if ( onlyGame && Cvar_Flags( "fs_game" ) & CVAR_MODIFIED ) {
+		// game directory change is needed
+		// return early to avoid systeminfo-cvar pollution in current fs_game
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: early return due to onlyGame + fs_game modified", s );
+#endif
+		return;
+	}
+#endif
 
 	// scan through all the variables in the systeminfo and locally set cvars to match
 	s = systemInfo;
@@ -453,6 +502,9 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 		}
 	}
 	while ( *s != '\0' );
+#ifdef STEF_LOGGING_DEFS
+	Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_SystemInfoChanged: sv_pure set to %i\n", Cvar_VariableIntegerValue( "sv_pure" ) );
+#endif
 }
 
 
@@ -498,7 +550,11 @@ static void CL_ParseServerInfo( void )
 CL_ParseGamestate
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_ParseGamestate, (msg_t *msg), (msg), "CLIENTSTATE" ) {
+#else
 static void CL_ParseGamestate( msg_t *msg ) {
+#endif
 	int				i;
 	entityState_t	*es;
 	int				newnum;
@@ -506,7 +562,9 @@ static void CL_ParseGamestate( msg_t *msg ) {
 	int				cmd;
 	const char		*s;
 	char			oldGame[ MAX_QPATH ];
+#ifndef NEW_FILESYSTEM
 	char			reconnectArgs[ MAX_CVAR_VALUE_STRING ];
+#endif
 	qboolean		gamedirModified;
 
 	Con_Close();
@@ -537,7 +595,11 @@ static void CL_ParseGamestate( msg_t *msg ) {
 	while ( 1 ) {
 		cmd = MSG_ReadByte( msg );
 
+#ifdef ELITEFORCE
+		if ( ( msg->compat && cmd <= 0 ) || cmd == svc_EOF ) {
+#else
 		if ( cmd == svc_EOF ) {
+#endif
 			break;
 		}
 
@@ -582,8 +644,14 @@ static void CL_ParseGamestate( msg_t *msg ) {
 
 	clc.eventMask |= EM_GAMESTATE;
 
+#ifdef ELITEFORCE
+	if( !msg->compat )
+#endif
 	clc.clientNum = MSG_ReadLong(msg);
 	// read the checksum feed
+#ifdef ELITEFORCE
+	if( !clc.demoplaying || !msg->compat )
+#endif
 	clc.checksumFeed = MSG_ReadLong( msg );
 
 	// save old gamedir
@@ -607,11 +675,15 @@ static void CL_ParseGamestate( msg_t *msg ) {
 	if ( !cl_oldGameSet && gamedirModified ) {
 		cl_oldGameSet = qtrue;
 		Q_strncpyz( cl_oldGame, oldGame, sizeof( cl_oldGame ) );
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "CLIENTSTATE", "CL_ParseGamestate setting cl_oldGameSet and cl_oldGame '%s'\n", cl_oldGame );
+#endif
 	}
 
 	// try to keep gamestate and connection state during game switch
 	cls.gameSwitch = gamedirModified;
 
+#ifndef NEW_FILESYSTEM
 	// preserve \cl_reconnectAgrs between online game directory changes
 	// so after mod switch \reconnect will not restore old value from config but use new one
 	if ( gamedirModified ) {
@@ -625,6 +697,7 @@ static void CL_ParseGamestate( msg_t *msg ) {
 	if ( gamedirModified ) {
 		Cvar_Set( "cl_reconnectArgs", reconnectArgs );
 	}
+#endif
 
 	cls.gameSwitch = qfalse;
 
@@ -646,6 +719,9 @@ returns qtrue for normal and empty archives
 */
 qboolean CL_ValidPakSignature( const byte *data, int len )
 {
+#ifdef STEF_IGNORE_PAK_SIGNATURE
+	return qtrue;
+#else
 	// maybe it is not 100% correct to check for file size here
 	// because we may receive more data in future packets
 	// but situation when server sends fragmented/shortened
@@ -663,6 +739,7 @@ qboolean CL_ValidPakSignature( const byte *data, int len )
 		return qtrue; // EOCD
 
 	return qfalse;
+#endif
 }
 
 //=====================================================================
@@ -760,7 +837,11 @@ static void CL_ParseDownload( msg_t *msg ) {
 			clc.download = FS_INVALID_HANDLE;
 
 			// rename the file
+#ifdef NEW_FILESYSTEM
+			FS_FinalizeDownload();
+#else
 			FS_SV_Rename( clc.downloadTempName, clc.downloadName );
+#endif
 		}
 
 		// send intentions now
@@ -844,6 +925,10 @@ void CL_ParseServerMessage( msg_t *msg ) {
 	}
 
 	clc.eventMask = 0;
+#ifdef ELITEFORCE
+	if( !msg->compat )
+	{
+#endif
 	MSG_Bitstream( msg );
 
 	// get the reliable sequence acknowledge number
@@ -861,6 +946,9 @@ void CL_ParseServerMessage( msg_t *msg ) {
 			Com_Error( ERR_DROP, "%s: incorrect reliable sequence acknowledge number", __func__ );
 		}
 	}
+#ifdef ELITEFORCE
+	}
+#endif
 
 	// parse the message
 	while ( 1 ) {
@@ -871,7 +959,11 @@ void CL_ParseServerMessage( msg_t *msg ) {
 
 		cmd = MSG_ReadByte( msg );
 
+#ifdef ELITEFORCE
+		if ( cmd == svc_EOF || ( msg->compat && cmd == -1 ) ) {
+#else
 		if ( cmd == svc_EOF) {
+#endif
 			SHOWNET( msg, "END OF MESSAGE" );
 			break;
 		}

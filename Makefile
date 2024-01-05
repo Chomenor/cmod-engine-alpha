@@ -216,6 +216,8 @@ BLIBDIR=$(MOUNT_DIR)/botlib
 JPDIR=$(MOUNT_DIR)/libjpeg
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
+FSDIR=$(MOUNT_DIR)/filesystem
+EFDIR=$(MOUNT_DIR)/eliteforce
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -294,6 +296,8 @@ ifeq ($(ARCH),aarch64)
 endif
 
 BASE_CFLAGS =
+
+  BASE_CFLAGS += -include $(MOUNT_DIR)/eliteforce/stef_config.h
 
 ifeq ($(USE_SYSTEM_JPEG),1)
   BASE_CFLAGS += -DUSE_SYSTEM_JPEG
@@ -764,6 +768,19 @@ endif
 ifneq ($(BUILD_SERVER),0)
 	@if [ ! -d $(B)/ded ];then $(MKDIR) $(B)/ded;fi
 endif
+	@if [ ! -d $(B)/client/filesystem ];then $(MKDIR) $(B)/client/filesystem;fi
+	@if [ ! -d $(B)/client/filesystem/fscore ];then $(MKDIR) $(B)/client/filesystem/fscore;fi
+	@if [ ! -d $(B)/client/filesystem/zlib ];then $(MKDIR) $(B)/client/filesystem/zlib;fi
+	@if [ ! -d $(B)/ded/filesystem ];then $(MKDIR) $(B)/ded/filesystem;fi
+	@if [ ! -d $(B)/ded/filesystem/fscore ];then $(MKDIR) $(B)/ded/filesystem/fscore;fi
+	@if [ ! -d $(B)/ded/filesystem/zlib ];then $(MKDIR) $(B)/ded/filesystem/zlib;fi
+	@if [ ! -d $(B)/client/eliteforce ];then $(MKDIR) $(B)/client/eliteforce;fi
+	@if [ ! -d $(B)/client/eliteforce/lua ];then $(MKDIR) $(B)/client/eliteforce/lua;fi
+	@if [ ! -d $(B)/client/eliteforce/mad ];then $(MKDIR) $(B)/client/eliteforce/mad;fi
+	@if [ ! -d $(B)/client/eliteforce/server ];then $(MKDIR) $(B)/client/eliteforce/server;fi
+	@if [ ! -d $(B)/ded/eliteforce ];then $(MKDIR) $(B)/ded/eliteforce;fi
+	@if [ ! -d $(B)/ded/eliteforce/lua ];then $(MKDIR) $(B)/ded/eliteforce/lua;fi
+	@if [ ! -d $(B)/ded/eliteforce/server ];then $(MKDIR) $(B)/ded/eliteforce/server;fi
 
 #############################################################################
 # CLIENT/SERVER
@@ -1006,6 +1023,94 @@ VORBISOBJ = \
 endif
 endif
 
+FSOBJ = \
+  $(B)/client/filesystem/fscore/fsc_cache.o \
+  $(B)/client/filesystem/fscore/fsc_crosshair.o \
+  $(B)/client/filesystem/fscore/fsc_gameparse.o \
+  $(B)/client/filesystem/fscore/fsc_iteration.o \
+  $(B)/client/filesystem/fscore/fsc_main.o \
+  $(B)/client/filesystem/fscore/fsc_md4.o \
+  $(B)/client/filesystem/fscore/fsc_misc.o \
+  $(B)/client/filesystem/fscore/fsc_os.o \
+  $(B)/client/filesystem/fscore/fsc_pk3.o \
+  $(B)/client/filesystem/fscore/fsc_sha256.o \
+  $(B)/client/filesystem/fscore/fsc_shader.o \
+  $(B)/client/filesystem/zlib/adler32.o \
+  $(B)/client/filesystem/zlib/crc32.o \
+  $(B)/client/filesystem/zlib/inffast.o \
+  $(B)/client/filesystem/zlib/inflate.o \
+  $(B)/client/filesystem/zlib/inftrees.o \
+  $(B)/client/filesystem/zlib/zutil.o \
+  $(B)/client/filesystem/fs_commands.o \
+  $(B)/client/filesystem/fs_download.o \
+  $(B)/client/filesystem/fs_fileio.o \
+  $(B)/client/filesystem/fs_filelist.o \
+  $(B)/client/filesystem/fs_lookup.o \
+  $(B)/client/filesystem/fs_main.o \
+  $(B)/client/filesystem/fs_misc.o \
+  $(B)/client/filesystem/fs_reference.o \
+  $(B)/client/filesystem/fs_trusted_vms.o
+
+EFCOMMON = \
+  $(B)/client/eliteforce/lua/lapi.o \
+  $(B)/client/eliteforce/lua/lauxlib.o \
+  $(B)/client/eliteforce/lua/lbaselib.o \
+  $(B)/client/eliteforce/lua/lcode.o \
+  $(B)/client/eliteforce/lua/lcorolib.o \
+  $(B)/client/eliteforce/lua/lctype.o \
+  $(B)/client/eliteforce/lua/ldblib.o \
+  $(B)/client/eliteforce/lua/ldebug.o \
+  $(B)/client/eliteforce/lua/ldo.o \
+  $(B)/client/eliteforce/lua/ldump.o \
+  $(B)/client/eliteforce/lua/lfunc.o \
+  $(B)/client/eliteforce/lua/lgc.o \
+  $(B)/client/eliteforce/lua/linit.o \
+  $(B)/client/eliteforce/lua/liolib.o \
+  $(B)/client/eliteforce/lua/llex.o \
+  $(B)/client/eliteforce/lua/lmathlib.o \
+  $(B)/client/eliteforce/lua/lmem.o \
+  $(B)/client/eliteforce/lua/loadlib.o \
+  $(B)/client/eliteforce/lua/lobject.o \
+  $(B)/client/eliteforce/lua/lopcodes.o \
+  $(B)/client/eliteforce/lua/loslib.o \
+  $(B)/client/eliteforce/lua/lparser.o \
+  $(B)/client/eliteforce/lua/lstate.o \
+  $(B)/client/eliteforce/lua/lstring.o \
+  $(B)/client/eliteforce/lua/lstrlib.o \
+  $(B)/client/eliteforce/lua/ltable.o \
+  $(B)/client/eliteforce/lua/ltablib.o \
+  $(B)/client/eliteforce/lua/ltm.o \
+  $(B)/client/eliteforce/lua/lundump.o \
+  $(B)/client/eliteforce/lua/lutf8lib.o \
+  $(B)/client/eliteforce/lua/lvm.o \
+  $(B)/client/eliteforce/lua/lzio.o \
+  $(B)/client/eliteforce/server/stef_sv_lua.o \
+  $(B)/client/eliteforce/server/stef_sv_misc.o \
+  $(B)/client/eliteforce/server/stef_sv_record_common.o \
+  $(B)/client/eliteforce/server/stef_sv_record_convert.o \
+  $(B)/client/eliteforce/server/stef_sv_record_main.o \
+  $(B)/client/eliteforce/server/stef_sv_record_spectator.o \
+  $(B)/client/eliteforce/server/stef_sv_record_writer.o \
+  $(B)/client/eliteforce/stef_common.o \
+  $(B)/client/eliteforce/stef_logging.o \
+  $(B)/client/eliteforce/stef_lua.o \
+  $(B)/client/eliteforce/stef_misc.o \
+  $(B)/client/eliteforce/vm_extensions.o
+
+EFCLIENT = \
+  $(B)/client/eliteforce/mad/mad_bit.o \
+  $(B)/client/eliteforce/mad/mad_decoder.o \
+  $(B)/client/eliteforce/mad/mad_fixed.o \
+  $(B)/client/eliteforce/mad/mad_frame.o \
+  $(B)/client/eliteforce/mad/mad_layer3.o \
+  $(B)/client/eliteforce/mad/mad_layer12.o \
+  $(B)/client/eliteforce/mad/mad_madhuffman.o \
+  $(B)/client/eliteforce/mad/mad_stream.o \
+  $(B)/client/eliteforce/mad/mad_synth.o \
+  $(B)/client/eliteforce/mad/mad_timer.o \
+  $(B)/client/eliteforce/mad/mad_version.o \
+  $(B)/client/eliteforce/snd_codec_mp3.o
+
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
   $(B)/client/cl_cin.o \
@@ -1097,6 +1202,10 @@ Q3OBJ = \
   $(B)/client/l_precomp.o \
   $(B)/client/l_script.o \
   $(B)/client/l_struct.o
+
+Q3OBJ += $(FSOBJ)
+Q3OBJ += $(EFCOMMON)
+Q3OBJ += $(EFCLIENT)
 
 ifneq ($(USE_SYSTEM_JPEG),1)
   Q3OBJ += $(JPGOBJ)
@@ -1314,6 +1423,9 @@ Q3DOBJ = \
   $(B)/ded/l_script.o \
   $(B)/ded/l_struct.o
 
+Q3DOBJ += $(subst /client/,/ded/,$(FSOBJ))
+Q3DOBJ += $(subst /client/,/ded/,$(EFCOMMON))
+
 ifdef MINGW
   Q3DOBJ += \
   $(B)/ded/win_main.o \
@@ -1439,6 +1551,18 @@ $(B)/ded/%.o: $(W32DIR)/%.c
 
 $(B)/ded/%.o: $(W32DIR)/%.rc
 	$(DO_WINDRES)
+
+$(B)/client/filesystem/%.o: $(FSDIR)/%.c
+	$(DO_CC)
+
+$(B)/ded/filesystem/%.o: $(FSDIR)/%.c
+	$(DO_DED_CC)
+
+$(B)/client/eliteforce/%.o: $(EFDIR)/%.c
+	$(DO_CC)
+
+$(B)/ded/eliteforce/%.o: $(EFDIR)/%.c
+	$(DO_DED_CC)
 
 #############################################################################
 # MISC

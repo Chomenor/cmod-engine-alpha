@@ -70,6 +70,11 @@ int SV_BotAllocateClient( void ) {
 	cl->tld[0] = '\0';
 	cl->country = "BOT";
 
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_PRE_CLIENT_CONNECT, i );
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_CLIENT_CONNECT, i );
+#endif
+
 	return i;
 }
 
@@ -92,6 +97,9 @@ void SV_BotFreeClient( int clientNum ) {
 	if ( cl->gentity ) {
 		cl->gentity->r.svFlags &= ~SVF_BOT;
 	}
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_CLIENT_DISCONNECT, clientNum );
+#endif
 }
 
 
@@ -254,7 +262,11 @@ BotImport_BSPEntityData
 ==================
 */
 static char *BotImport_BSPEntityData(void) {
+#ifdef STEF_LUA_SUPPORT
+	return SV_Lua_GetEntityString( qtrue );
+#else
 	return CM_EntityString();
+#endif
 }
 
 /*

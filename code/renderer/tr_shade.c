@@ -811,8 +811,16 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle ) {
 */
 static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 {
+#ifdef ELITEFORCE
+	shaderStage_t *pStage;
+#else
 	const shaderStage_t *pStage;
+#endif
 	int stage;
+#ifdef ELITEFORCE
+	qboolean overridealpha = qfalse;
+	int oldalphaGen = 0;
+#endif
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
@@ -832,7 +840,22 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( !setArraysOnce )
 			{
 				R_ComputeTexCoords( 0, &pStage->bundle[0] );
+#ifdef ELITEFORCE
+				// Override the shader alpha channel if requested.
+				if(backEnd.currentEntity->e.renderfx & RF_FORCE_ENT_ALPHA)
+				{
+					overridealpha = qtrue;
+					oldalphaGen = pStage->alphaGen;
+					pStage->alphaGen = AGEN_ENTITY;
+				}
+				else
+					overridealpha = qfalse;
+#endif
 				R_ComputeColors( pStage );
+#ifdef ELITEFORCE
+				if(overridealpha)
+					pStage->alphaGen = oldalphaGen;
+#endif
 
 				GL_ClientState( 1, CLS_NONE );
 				GL_ClientState( 0, CLS_TEXCOORD_ARRAY | CLS_COLOR_ARRAY );
@@ -846,6 +869,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			//
 			R_BindAnimatedImage( &pStage->bundle[0] );
 
+#ifdef ELITEFORCE
+			if(overridealpha && backEnd.currentEntity->e.shader.rgba[3] < 0xFF && !(pStage->stateBits & GLS_ATEST_BITS))
+			{
+				GL_State((pStage->stateBits & ~(GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS | GLS_ATEST_BITS))  // remove the shader set values.
+					 | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_ATEST_GT_0); // Now add the default values.
+			}
+			else
+#endif
 			GL_State( pStage->stateBits );
 
 			//
@@ -919,7 +950,11 @@ void RB_StageIteratorGeneric( void )
 	// to avoid compiling those arrays since they will change
 	// during multipass rendering
 	//
+#ifdef ELITEFORCE
+	if ( tess.numPasses > 1 || ( backEnd.currentEntity->e.renderfx & RF_FORCE_ENT_ALPHA ) )
+#else
 	if ( tess.numPasses > 1 )
+#endif
 	{
 		setArraysOnce = qfalse;
 

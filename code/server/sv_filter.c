@@ -734,7 +734,11 @@ static void SV_ReloadFilters( const char *filename, filter_node_t *new_node )
 	static fileOffset_t loaded_fsize;
 	static fileTime_t loaded_ctime;
 	static fileTime_t loaded_mtime;
+#ifdef NEW_FILESYSTEM
+	char ospath[FS_MAX_PATH];
+#else
 	const char *ospath;
+#endif
 
 	if ( *filename && ( tempCount || new_node ) )
 	{
@@ -743,7 +747,14 @@ static void SV_ReloadFilters( const char *filename, filter_node_t *new_node )
 		qboolean reload;
 		qboolean dump;
 
+#ifdef NEW_FILESYSTEM
+		if ( !FS_GeneratePathWritedir( FS_GetCurrentGameDir(), filename, FS_CREATE_DIRECTORIES,
+				FS_ALLOW_DIRECTORIES | FS_CREATE_DIRECTORIES_FOR_FILE, ospath, sizeof( ospath ) ) ) {
+			return;
+		}
+#else
 		ospath = FS_BuildOSPath( FS_GetHomePath(), FS_GetCurrentGameDir(), filename );
+#endif
 		if ( strcmp( ospath, loaded_name ) )
 			reload = qtrue;
 		else if ( !Sys_GetFileStats( loaded_name, &curr_fsize, &curr_mtime, &curr_ctime ) )
@@ -800,7 +811,13 @@ static void SV_ReloadFilters( const char *filename, filter_node_t *new_node )
 		}
 	}
 
+#ifdef NEW_FILESYSTEM
+	if ( !FS_GeneratePathWritedir( FS_GetCurrentGameDir(), filename, 0, FS_ALLOW_DIRECTORIES, ospath, sizeof( ospath ) ) ) {
+		return;
+	}
+#else
 	ospath = FS_BuildOSPath( FS_GetHomePath(), FS_GetCurrentGameDir(), filename );
+#endif
 	if ( *filename && strcmp( ospath, loaded_name ) == 0 )
 	{
 		fileTime_t curr_ctime, curr_mtime;

@@ -165,7 +165,11 @@ qboolean CL_cURL_Init( void )
 CL_cURL_Shutdown
 =================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_VOID( CL_cURL_Shutdown, (void), (), "clientstate" )
+#else
 void CL_cURL_Shutdown( void )
+#endif
 {
 	CL_cURL_Cleanup();
 #ifdef USE_CURL_DLOPEN
@@ -304,8 +308,12 @@ void CL_cURL_BeginDownload( const char *localName, const char *remoteURL )
 	CL_cURL_Cleanup();
 	Q_strncpyz(clc.downloadURL, remoteURL, sizeof(clc.downloadURL));
 	Q_strncpyz(clc.downloadName, localName, sizeof(clc.downloadName));
+#ifdef NEW_FILESYSTEM
+	Com_sprintf(clc.downloadTempName, sizeof(clc.downloadTempName), "download.temp");
+#else
 	Com_sprintf(clc.downloadTempName, sizeof(clc.downloadTempName),
 		"%s.tmp", localName);
+#endif
 
 	// Set so UI gets access to it
 	Cvar_Set( "cl_downloadName", localName );
@@ -408,7 +416,11 @@ void CL_cURL_PerformDownload( void )
 	}
 	CL_cURL_CloseDownload();
 	if ( msg->msg == CURLMSG_DONE && msg->data.result == CURLE_OK ) {
+#ifdef NEW_FILESYSTEM
+		FS_FinalizeDownload();
+#else
 		FS_SV_Rename( clc.downloadTempName, clc.downloadName );
+#endif
 		clc.downloadRestart = qtrue;
 	}
 	else {
@@ -416,9 +428,14 @@ void CL_cURL_PerformDownload( void )
 
 		qcurl_easy_getinfo(msg->easy_handle, CURLINFO_RESPONSE_CODE,
 			&code);	
+#ifdef NEW_FILESYSTEM
+		Com_Printf("Download Error: %s Code: %ld URL: %s\n",
+			qcurl_easy_strerror(msg->data.result), code, clc.downloadURL);
+#else
 		Com_Error(ERR_DROP, "Download Error: %s Code: %ld URL: %s",
 			qcurl_easy_strerror(msg->data.result),
 			code, clc.downloadURL);
+#endif
 	}
 
 	CL_NextDownload();
@@ -1100,7 +1117,11 @@ qboolean Com_DL_Perform( download_t *dl )
 		}
 		else
 		{
+#ifdef NEW_FILESYSTEM
+			n = 0;
+#else
 			n = FS_GetZipChecksum( name );
+#endif
 			Com_sprintf( name, sizeof( name ), "%s%c%s.%08x.pk3", dl->gameDir, PATH_SEP, dl->Name, n );
 
 			if ( FS_SV_FileExists( name ) )
@@ -1110,7 +1131,10 @@ qboolean Com_DL_Perform( download_t *dl )
 		}
 
 		Com_DL_Cleanup( dl );
+#ifdef NEW_FILESYSTEM
+#else
 		FS_Reload(); //clc.downloadRestart = qtrue;
+#endif
 		Com_Printf( S_COLOR_GREEN "%s downloaded\n", name );
 		if ( autoDownload )
 		{

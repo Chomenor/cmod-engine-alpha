@@ -193,8 +193,10 @@ typedef struct client_s {
 	int				ping;
 	int				rate;				// bytes / second, 0 - unlimited
 	int				snapshotMsec;		// requests a snapshot every snapshotMsec unless rate choked
+#ifndef NEW_FILESYSTEM
 	qboolean		pureAuthentic;
 	qboolean		gotCP;				// TTimo - additional flag to distinguish between a bad pure checksum, and no cp command at all
+#endif
 	netchan_t		netchan;
 	// TTimo
 	// queuing outgoing fragmented messages to send them properly, without udp packet bursts
@@ -220,6 +222,12 @@ typedef struct client_s {
 	char			tld[3]; // "XX\0"
 	const char		*country;
 
+#ifdef STEF_MAP_RESTART_STATIC_SERVERID
+	int mapRestartNetchanSequence;
+#endif
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+	int maxEntityBaseline;
+#endif
 } client_t;
 
 //=============================================================================
@@ -489,3 +497,7 @@ void SV_LoadFilters( const char *filename );
 const char *SV_RunFilters( const char *userinfo, const netadr_t *addr );
 void SV_AddFilter_f( void );
 void SV_AddFilterCmd_f( void );
+
+#ifdef STEF_COMMON_HEADERS
+#include "../eliteforce/server/stef_sv_general.h"
+#endif

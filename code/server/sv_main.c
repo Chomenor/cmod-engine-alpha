@@ -152,6 +152,10 @@ void SV_AddServerCommand( client_t *client, const char *cmd ) {
 	if ( client->state < CS_PRIMED )
 		return;
 
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessServercmd( client - svs.clients, cmd );
+#endif
+
 	client->reliableSequence++;
 	// if we would be losing an old command that hasn't been acknowledged,
 	// we must drop the connection
@@ -315,10 +319,19 @@ static void SV_MasterHeartbeat( const char *message )
 		// this command should be changed if the server info / status format
 		// ever changes incompatibly
 
+#ifdef ELITEFORCE
+		if(adr[i][0].type != NA_BAD)
+			NET_OutOfBandPrint(NS_SERVER, &adr[i][0], "\\heartbeat\\%d\\gamename\\%s\\",
+					   Cvar_VariableIntegerValue("net_port"), message);
+		if(adr[i][1].type != NA_BAD)
+			NET_OutOfBandPrint(NS_SERVER, &adr[i][1], "\\heartbeat\\%d\\gamename\\%s\\",
+					   Cvar_VariableIntegerValue("net_port6"), message);
+#else
 		if(adr[i][0].type != NA_BAD)
 			NET_OutOfBandPrint( NS_SERVER, &adr[i][0], "heartbeat %s\n", message);
 		if(adr[i][1].type != NA_BAD)
 			NET_OutOfBandPrint( NS_SERVER, &adr[i][1], "heartbeat %s\n", message);
+#endif
 	}
 }
 
@@ -688,6 +701,18 @@ static void SVC_Status( const netadr_t *from ) {
 
 	Q_strncpyz( infostring, Cvar_InfoString( CVAR_SERVERINFO, NULL ), sizeof( infostring ) );
 
+#ifdef STEF_GETSTATUS_FIXES
+	// Echelon server browser expects "v1.20" in version string.
+	Info_SetValueForKey( infostring, "version_cmod", Q3_VERSION " " PLATFORM_STRING " " __DATE__ );
+	Info_SetValueForKey( infostring, "version", "cMod HM v1.20 compatible" );
+
+	// Qtracker may expect "baseEF" value for gamename. Only perform this adjustment for
+	// queries with a challenge parameter to minimize any effect on visible info.
+	if ( *Cmd_Argv( 1 ) ) {
+		Info_SetValueForKey( infostring, "gamename", "baseEF" );
+	}
+#endif
+
 	// echo back the parameter to status. so master servers can use it as a challenge
 	// to prevent timed spoofed reply packets that add ghost servers
 	Info_SetValueForKey( infostring, "challenge", Cmd_Argv( 1 ) );
@@ -702,7 +727,11 @@ static void SVC_Status( const netadr_t *from ) {
 
 			ps = SV_GameClientNum( i );
 			playerLength = Com_sprintf( player, sizeof( player ), "%i %i \"%s\"\n", 
+#ifdef STEF_SUPPORT_STATUS_SCORES_OVERRIDE
+				SV_StatusScoresOverride_AdjustScore( ps->persistant[ PERS_SCORE ], i ), cl->ping, cl->name );
+#else
 				ps->persistant[ PERS_SCORE ], cl->ping, cl->name );
+#endif
 			
 			if ( statusLength + playerLength >= MAX_PACKETLEN-4 )
 				break; // can't hold any more
@@ -793,7 +822,11 @@ static void SVC_Info( const netadr_t *from ) {
 		Info_SetValueForKey( infostring, "game", gamedir );
 	}
 
+#ifdef ELITEFORCE
+	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse \"%s\"", infostring );
+#else
 	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse\n%s", infostring );
+#endif
 }
 
 
@@ -911,6 +944,7 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 	MSG_BeginReadingOOB( msg );
 	MSG_ReadLong( msg );		// skip the -1 marker
 
+#ifndef ELITEFORCE
 	if ( !memcmp( "connect ", msg->data + 4, 8 ) ) {
 		if ( msg->cursize > MAX_INFO_STRING*2 ) { // if we assume 200% compression ratio on userinfo
 			if ( com_developer->integer ) {
@@ -920,6 +954,7 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		}
 		Huff_Decompress( msg, 12 );
 	}
+#endif
 
 	s = MSG_ReadStringLine( msg );
 	Cmd_TokenizeString( s );
@@ -929,6 +964,12 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 	if ( com_developer->integer ) {
 		Com_Printf( "SV packet %s : %s\n", NET_AdrToString( from ), c );
 	}
+
+#ifdef STEF_LUA_SERVER
+	if ( SV_Lua_PacketCommand( from ) ) {
+		return;
+	}
+#endif
 
 	if ( !Q_stricmp(c, "rcon") ) {
 		SVC_RemoteCommand( from );
@@ -1008,6 +1049,10 @@ void SV_PacketEvent( const netadr_t *from, msg_t *msg ) {
 			continue;
 		}
 
+#ifdef ELITEFORCE
+		msg->compat = cl->compat;
+#endif
+
 		// make sure it is a valid, in sequence packet
 		if (SV_Netchan_Process(cl, msg)) {
 			// the IP port can't be used to differentiate clients, because
@@ -1027,6 +1072,9 @@ void SV_PacketEvent( const netadr_t *from, msg_t *msg ) {
 			return;
 		}
 	}
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessPacketEvent( from, msg, qport );
+#endif
 }
 
 
@@ -1061,6 +1109,26 @@ static void SV_CalcPings( void ) {
 
 		total = 0;
 		count = 0;
+#ifdef STEF_SV_PINGFIX
+		if ( sv_pingFix->integer ) {
+			int current_frame = cl->netchan.outgoingSequence - 1;
+			int current_ack_time = 0;
+			for ( j = 0; j < PACKET_BACKUP && current_frame > 0; j++ ) {
+				// Read frames backwards from recent to old.
+				clientSnapshot_t *frame = &cl->frames[( current_frame-- ) & PACKET_MASK];
+
+				if ( frame->messageAcked && ( !current_ack_time || frame->messageAcked < current_ack_time ) ) {
+					current_ack_time = frame->messageAcked;
+				}
+
+				if ( current_ack_time ) {
+					delta = current_ack_time - frame->messageSent;
+					count++;
+					total += delta;
+				}
+			}
+		} else
+#endif
 		for ( j = 0 ; j < PACKET_BACKUP ; j++ ) {
 			if ( cl->frames[j].messageAcked == 0 ) {
 				continue;
@@ -1076,6 +1144,13 @@ static void SV_CalcPings( void ) {
 			if ( cl->ping > 999 ) {
 				cl->ping = 999;
 			}
+#ifdef STEF_SV_PINGFIX
+			if ( cl->ping < 1 ) {
+				// Server browsers assume that players with 0 ping are bots, so make sure the
+				// minimum ping for humans is 1.
+				cl->ping = 1;
+			}
+#endif
 		}
 
 		// let the game dll know about the ping

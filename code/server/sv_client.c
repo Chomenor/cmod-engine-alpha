@@ -542,8 +542,13 @@ void SV_DirectConnect( const netadr_t *from ) {
 			// avoid excessive outgoing traffic
 			if ( !SVC_RateLimit( &bucket, 10, 200 ) )
 			{
+#ifdef STEF_PROTOCOL_MSG_FIX
+				// Old ioEF clients check for this exact message string to switch to legacy protocol.
+				NET_OutOfBandPrint( NS_SERVER, from, "print\nServer uses protocol version 24.\n" );
+#else
 				NET_OutOfBandPrint( NS_SERVER, from, "print\nServer uses protocol version %i "
 					"(yours is %i).\n", sv_proto, cl_proto );
+#endif
 			}
 			Com_DPrintf( "    rejected connect from version %i\n", cl_proto );
 			return;
@@ -580,6 +585,12 @@ void SV_DirectConnect( const netadr_t *from ) {
 	Info_RemoveKey( userinfo, "protocol" );
 	Info_RemoveKey( userinfo, "client" );
 
+#ifdef STEF_MARIO_MOD_FIX
+	if ( Stef_MarioModFix_ModActive ) {
+		Info_SetValueForKey( userinfo, "cg_mmodVersn", "base_md01" );
+	}
+#endif
+
 	// don't let "ip" overflow userinfo string
 	if ( NET_IsLocalAddress( from ) )
 		ip = "localhost";
@@ -594,6 +605,12 @@ void SV_DirectConnect( const netadr_t *from ) {
 		}
 		return;
 	}
+
+#ifdef STEF_SERVER_RECORD
+	if ( Record_ProcessClientConnect( from, userinfo, challenge, qport, compat ) ) {
+		return;
+	}
+#endif
 
 	// run userinfo filter
 	SV_SetTLD( tld, from, Sys_IsLANAddress( from ) );
@@ -741,6 +758,10 @@ gotnewcl:
 	strcpy( newcl->tld, tld );
 	newcl->country = SV_FindCountry( newcl->tld );
 
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_PRE_CLIENT_CONNECT, clientNum );
+#endif
+
 	SV_UserinfoChanged( newcl, qtrue, qfalse ); // update userinfo, do not run filter
 
 	if ( sv_clientTLD->integer ) {
@@ -784,6 +805,10 @@ gotnewcl:
 	// notice that it is from a different serverid and that the
 	// gamestate message was not just sent, forcing a retransmit
 	newcl->gamestateMessageNum = newcl->messageAcknowledge - 1; // force gamestate retransmit
+
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_CLIENT_CONNECT, clientNum );
+#endif
 
 	// if this was the first client on the server, or the last client
 	// the server can hold, send a heartbeat to the master.
@@ -849,6 +874,11 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 
 	// add the disconnect command
 	if ( reason ) {
+#ifdef ELITEFORCE
+		if( drop->compat )
+			SV_SendServerCommand( drop, "disconnect %s", reason);
+		else
+#endif
 		SV_SendServerCommand( drop, "disconnect \"%s\"", reason );
 	}
 
@@ -870,6 +900,10 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 		Com_DPrintf( "Going to CS_ZOMBIE for %s\n", name );
 		drop->state = CS_ZOMBIE;		// become free in a few seconds
 	}
+
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_CLIENT_DISCONNECT, drop - svs.clients );
+#endif
 
 	if ( !reason ) {
 		return;
@@ -978,7 +1012,11 @@ It will be resent if the client acknowledges a later message but has
 the wrong gamestate.
 ================
 */
+#ifdef STEF_LUA_SERVER
+void SV_SendClientGameState( client_t *client ) {
+#else
 static void SV_SendClientGameState( client_t *client ) {
+#endif
 	int			start;
 	entityState_t nullstate;
 	const svEntity_t *svEnt;
@@ -992,8 +1030,10 @@ static void SV_SendClientGameState( client_t *client ) {
 	}
 	client->state = CS_PRIMED;
 
+#ifndef NEW_FILESYSTEM
 	client->pureAuthentic = qfalse;
 	client->gotCP = qfalse;
+#endif
 
 	// to start generating delta for packet entities
 	client->gentity = SV_GentityNum( client - svs.clients );
@@ -1003,10 +1043,22 @@ static void SV_SendClientGameState( client_t *client ) {
 	// gamestate message was not just sent, forcing a retransmit
 	client->gamestateMessageNum = client->netchan.outgoingSequence;
 
+#ifdef ELITEFORCE
+	if( client->compat )
+		MSG_InitOOB(&msg, msgBuffer, sizeof( msgBuffer ) );
+	else
+#endif
 	MSG_Init( &msg, msgBuffer, MAX_MSGLEN );
+
+#ifdef ELITEFORCE
+	msg.compat = client->compat;
+#endif
 
 	// NOTE, MRE: all server->client messages now acknowledge
 	// let the client know which reliable clientCommands we have received
+#ifdef ELITEFORCE
+	if( !msg.compat )
+#endif
 	MSG_WriteLong( &msg, client->lastClientCommand );
 
 	// send any server commands waiting to be sent first.
@@ -1020,6 +1072,9 @@ static void SV_SendClientGameState( client_t *client ) {
 	MSG_WriteLong( &msg, client->reliableSequence );
 
 	// write the configstrings
+#ifdef STEF_LUA_SUPPORT
+	if ( !SV_Lua_GamestateConfigstrings( client - svs.clients, &msg ) )
+#endif
 	for ( start = 0 ; start < MAX_CONFIGSTRINGS ; start++ ) {
 		if (sv.configstrings[start][0]) {
 			MSG_WriteByte( &msg, svc_configstring );
@@ -1028,19 +1083,37 @@ static void SV_SendClientGameState( client_t *client ) {
 		}
 	}
 
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+	// update client->baseline_cutoff
+	SV_CalculateMaxBaselines( client, msg );
+#endif
+
 	// write the baselines
 	Com_Memset( &nullstate, 0, sizeof( nullstate ) );
 	for ( start = 0 ; start < MAX_GENTITIES; start++ ) {
 		if ( !sv.baselineUsed[ start ] ) {
 			continue;
 		}
+#ifdef STEF_GAMESTATE_OVERFLOW_FIX
+		if ( start > client->maxEntityBaseline ) {
+			continue;
+		}
+#endif
 		svEnt = &sv.svEntities[ start ];
 		MSG_WriteByte( &msg, svc_baseline );
 		MSG_WriteDeltaEntity( &msg, &nullstate, &svEnt->baseline, qtrue );
 	}
 
+#ifdef ELITEFORCE
+	if( msg.compat )
+		MSG_WriteByte(&msg, 0);
+	else
+#endif
 	MSG_WriteByte( &msg, svc_EOF );
 
+#ifdef ELITEFORCE
+	if( !msg.compat )
+#endif
 	MSG_WriteLong( &msg, client - svs.clients );
 
 	// write the checksum feed
@@ -1050,6 +1123,9 @@ static void SV_SendClientGameState( client_t *client ) {
 	// but at this stage client can't process any reliable commands
 	// so at least try to inform him in console and release connection slot
 	if ( msg.overflowed ) {
+#ifdef STEF_LOGGING_DEFS
+		Logging_Printf( LP_INFO, "SERVER_WARNINGS SERVERSTATE", "Gamestate overflow for client %i", (int)( client - svs.clients ) );
+#endif
 		if ( client->netchan.remoteAddress.type == NA_LOOPBACK ) {
 			Com_Error( ERR_DROP, "gamestate overflow" );
 		} else {
@@ -1218,6 +1294,69 @@ static void SV_BeginDownload_f( client_t *cl ) {
 }
 
 
+#ifdef NEW_FILESYSTEM
+/*
+==================
+SV_OpenDownloadError
+
+Sends error message to client.
+==================
+*/
+static void SV_OpenDownloadError( client_t *cl, const char *errorMessage ) {
+	msg_t msg;
+	byte msgBuffer[1024];
+
+	MSG_Init( &msg, msgBuffer, sizeof( msgBuffer ) - 8 );
+	MSG_WriteLong( &msg, cl->lastClientCommand );
+
+	MSG_WriteByte( &msg, svc_download );
+	MSG_WriteShort( &msg, 0 ); // client is expecting block zero
+	MSG_WriteLong( &msg, -1 ); // illegal file size
+
+#ifdef ELITEFORCE
+	if ( !msg.compat )
+#endif
+	MSG_WriteString( &msg, errorMessage );
+
+#ifdef ELITEFORCE
+	if ( !msg.compat )
+#endif
+	MSG_WriteByte( &msg, svc_EOF );
+	SV_Netchan_Transmit( cl, &msg );
+}
+
+/*
+==================
+SV_OpenDownload
+
+Returns qtrue on success, qfalse otherwise.
+==================
+*/
+static qboolean SV_OpenDownload( client_t *cl ) {
+	char pak_name[MAX_QPATH];
+	COM_StripExtension( cl->downloadName, pak_name, sizeof( pak_name ) );
+
+	if ( !( sv_allowDownload->integer & DLF_ENABLE ) || ( sv_allowDownload->integer & DLF_NO_UDP ) ) {
+		Com_Printf( "clientDownload: %d : \"%s\" UDP download disabled by server sv_allowDownload setting\n",
+				(int)( cl - svs.clients ), cl->downloadName );
+		SV_OpenDownloadError( cl, va( "Could not download \"%s\" because autodownloading is disabled on the server.\n"
+				"Set autodownload to No in your settings and you might be able to join the game anyway.\n", cl->downloadName ) );
+		return qfalse;
+	}
+
+	cl->download = FS_OpenDownloadPak( cl->downloadName, (unsigned int *)&cl->downloadSize );
+	if ( !cl->download ) {
+		// This could happen if the map changed during a client's download sequence
+		Com_Printf( "clientDownload: %d : \"%s\" failed to load download pk3\n", (int)( cl - svs.clients ), cl->downloadName );
+		SV_OpenDownloadError( cl, va( "File \"%s\" not available on server for downloading.\n"
+				"Try reconnecting to the server.\n", cl->downloadName ) );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+#endif
+
 /*
 ==================
 SV_WriteDownloadToClient
@@ -1229,16 +1368,37 @@ Fill up msg with data, return number of download blocks added
 static int SV_WriteDownloadToClient( client_t *cl )
 {
 	int curindex;
+#ifndef NEW_FILESYSTEM
 	int unreferenced = 1;
 	char errorMessage[1024];
 	char pakbuf[MAX_QPATH], *pakptr;
 	int numRefPaks;
+#endif
 	msg_t msg;
 	byte msgBuffer[MAX_DOWNLOAD_BLKSIZE*2+8];
 
 	if ( cl->download == FS_INVALID_HANDLE ) {
+#ifdef STEF_LUA_SUPPORT
+		// Give Lua system a chance to open the file.
+		SV_Lua_OpenDownload( cl - svs.clients );
+		if ( !*cl->downloadName ) {
+			// aborted
+			return 1;
+		}
+		if ( cl->download != FS_INVALID_HANDLE ) {
+			goto start_download;
+		}
+#endif
+#ifdef NEW_FILESYSTEM
+		if ( !SV_OpenDownload( cl ) ) {
+			*cl->downloadName = '\0';
+			return 1;
+		}
+#else
 		qboolean idPack = qfalse;
+#ifndef ELITEFORCE
 		qboolean missionPack = qfalse;
+#endif
  		// Chop off filename extension.
 		Q_strncpyz( pakbuf, cl->downloadName, sizeof( pakbuf ) );
 		pakptr = strrchr( pakbuf, '.' );
@@ -1263,8 +1423,12 @@ static int SV_WriteDownloadToClient( client_t *cl )
 
 						// now that we know the file is referenced,
 						// check whether it's legal to download it.
+#ifdef ELITEFORCE
+						idPack = FS_idPak(pakbuf, BASEGAME, NUM_ID_PAKS);
+#else
 						missionPack = FS_idPak(pakbuf, BASETA, NUM_TA_PAKS);
 						idPack = missionPack || FS_idPak(pakbuf, BASEGAME, NUM_ID_PAKS);
+#endif
 
 						break;
 					}
@@ -1287,6 +1451,10 @@ static int SV_WriteDownloadToClient( client_t *cl )
 				Com_sprintf(errorMessage, sizeof(errorMessage), "File \"%s\" is not referenced and cannot be downloaded.", cl->downloadName);
 			}
 			else if (idPack) {
+#ifdef ELITEFORCE
+				Com_Printf("clientDownload: %d : \"%s\" cannot download Raven pk3 files\n", (int) (cl - svs.clients), cl->downloadName);
+				Com_sprintf(errorMessage, sizeof(errorMessage), "Cannot autodownload Raven pk3 file \"%s\"", cl->downloadName);
+#else
 				Com_Printf("clientDownload: %d : \"%s\" cannot download id pk3 files\n", (int) (cl - svs.clients), cl->downloadName);
 				if (missionPack) {
 					Com_sprintf(errorMessage, sizeof(errorMessage), "Cannot autodownload Team Arena file \"%s\"\n"
@@ -1295,6 +1463,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 				else {
 					Com_sprintf(errorMessage, sizeof(errorMessage), "Cannot autodownload id pk3 file \"%s\"", cl->downloadName);
 				}
+#endif
 			}
 			else if ( !(sv_allowDownload->integer & DLF_ENABLE) ||
 				(sv_allowDownload->integer & DLF_NO_UDP) ) {
@@ -1323,6 +1492,9 @@ static int SV_WriteDownloadToClient( client_t *cl )
 			MSG_WriteByte( &msg, svc_download );
 			MSG_WriteShort( &msg, 0 ); // client is expecting block zero
 			MSG_WriteLong( &msg, -1 ); // illegal file size
+#ifdef ELITEFORCE
+			if(!msg.compat)
+#endif
 			MSG_WriteString( &msg, errorMessage );
 
 			MSG_WriteByte( &msg, svc_EOF );
@@ -1337,6 +1509,11 @@ static int SV_WriteDownloadToClient( client_t *cl )
 
 			return 1;
 		}
+#endif
+
+#ifdef STEF_LUA_SUPPORT
+		start_download:
+#endif
 
 		Com_Printf( "clientDownload: %d : beginning \"%s\"\n", (int) (cl - svs.clients), cl->downloadName );
 
@@ -1344,6 +1521,9 @@ static int SV_WriteDownloadToClient( client_t *cl )
 		cl->downloadCurrentBlock = cl->downloadClientBlock = cl->downloadXmitBlock = 0;
 		cl->downloadCount = 0;
 		cl->downloadEOF = qfalse;
+#ifdef STEF_DOWNLOAD_CONNECTION_STATE_FIX
+		cl->state = CS_CONNECTED;
+#endif
 	}
 
 	// Perform any reads that we need to
@@ -1397,8 +1577,44 @@ static int SV_WriteDownloadToClient( client_t *cl )
 	// Send current block
 	curindex = (cl->downloadXmitBlock % MAX_DOWNLOAD_WINDOW);
 
+#ifdef ELITEFORCE
+	if ( cl->compat ) {
+		MSG_InitOOB( &msg, msgBuffer, sizeof( msgBuffer ) );
+		msg.compat = qtrue;
+
+		// Original EF client expects a snapshot ahead of download message,
+		// so add a minimal "dummy" snapshot
+		MSG_WriteByte( &msg, svc_snapshot );
+		MSG_WriteLong( &msg, cl->lastClientCommand );
+
+		if ( cl->oldServerTime ) {
+			MSG_WriteLong( &msg, cl->oldServerTime );
+		} else {
+			MSG_WriteLong( &msg, sv.time );
+		}
+
+		// Delta frame, snapflags, areabits
+		MSG_WriteByte( &msg, 0 );
+		MSG_WriteByte( &msg, 0 );
+		MSG_WriteByte( &msg, 0 );
+
+		// Playerstate
+		MSG_WriteBits( &msg, 0, 32 );
+		MSG_WriteBits( &msg, 0, 20 );
+
+		// Entities
+		MSG_WriteBits( &msg, ( MAX_GENTITIES - 1 ), GENTITYNUM_BITS );
+
+		goto done_message_init;
+	}
+#endif
+
 	MSG_Init( &msg, msgBuffer, sizeof( msgBuffer ) - 8 );
 	MSG_WriteLong( &msg, cl->lastClientCommand );
+
+#ifdef ELITEFORCE
+	done_message_init:
+#endif
 
 	MSG_WriteByte( &msg, svc_download );
 	MSG_WriteShort( &msg, cl->downloadXmitBlock );
@@ -1413,6 +1629,9 @@ static int SV_WriteDownloadToClient( client_t *cl )
 	if ( cl->downloadBlockSize[curindex] > 0 )
 		MSG_WriteData( &msg, cl->downloadBlocks[curindex], cl->downloadBlockSize[curindex] );
 
+#ifdef ELITEFORCE
+	if ( !cl->compat )
+#endif
 	MSG_WriteByte( &msg, svc_EOF );
 	SV_Netchan_Transmit( cl, &msg );
 
@@ -1497,6 +1716,27 @@ static void SV_Disconnect_f( client_t *cl ) {
 }
 
 
+#ifdef NEW_FILESYSTEM
+/*
+=================
+SV_VerifyPaks_f
+
+Placeholder functions to handle the deprecated cp command.
+=================
+*/
+static void SV_VerifyPaks_f( client_t *cl ) {
+}
+
+/*
+=================
+SV_ResetPureClient_f
+
+Placeholder functions to handle the deprecated vdr command.
+=================
+*/
+static void SV_ResetPureClient_f( client_t *cl ) {
+}
+#else
 /*
 =================
 SV_VerifyPaks_f
@@ -1536,6 +1776,10 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 		// start at arg 2 ( skip serverId cl_paks )
 		nCurArg = 1;
 
+#ifdef ELITEFORCE
+		if(!cl->compat)
+		{
+#endif
 		pArg = Cmd_Argv(nCurArg++);
 		if ( !*pArg ) {
 			bGood = qfalse;
@@ -1551,6 +1795,9 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 				return;
 			}
 		}
+#ifdef ELITEFORCE
+		}
+#endif
 
 		// we basically use this while loop to avoid using 'goto' :)
 		while (bGood) {
@@ -1655,6 +1902,7 @@ static void SV_ResetPureClient_f( client_t *cl ) {
 	cl->pureAuthentic = qfalse;
 	cl->gotCP = qfalse;
 }
+#endif
 
 
 /*
@@ -1709,6 +1957,12 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 	else
 		i = sv_fps->integer; // sync with server
 
+#ifdef STEF_MIN_SNAPS
+	if ( i < sv_minSnaps->integer ) {
+		i = sv_minSnaps->integer;
+	}
+#endif
+
 	// range check
 	if ( i < 1 )
 		i = 1;
@@ -1726,6 +1980,21 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 
 	if ( !updateUserinfo )
 		return;
+
+#ifdef STEF_MODEL_NAME_LENGTH_LIMIT
+	if ( sv_maxModelLength->integer >= 16 &&
+			strlen( Info_ValueForKey( cl->userinfo, "model" ) ) > sv_maxModelLength->integer ) {
+		// wipe the model name
+		Info_SetValueForKey( cl->userinfo, "model", "munro/default" );
+
+		// confirm set was successful to be safe
+		// if it failed for some reason wipe the whole userinfo
+		if ( strlen( Info_ValueForKey( cl->userinfo, "model" ) ) > sv_maxModelLength->integer ) {
+			Com_sprintf( cl->userinfo, sizeof( cl->userinfo ), "\\model\\munro/default\\ip\\%s",
+					Info_ValueForKey( cl->userinfo, "ip" ) );
+		}
+	}
+#endif
 
 	// name for C code
 	val = Info_ValueForKey( cl->userinfo, "name" );
@@ -1766,6 +2035,9 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 			SV_DropClient( cl, val );
 		}
 	}
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_USERINFO_CHANGED, cl - svs.clients );
+#endif
 }
 
 
@@ -1917,6 +2189,12 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 
 	Cmd_TokenizeString( s );
 
+#ifdef STEF_LUA_SERVER
+	if ( SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_CLIENT_COMMAND, cl - svs.clients ) ) {
+		return qtrue;
+	}
+#endif
+
 	// malicious users may try using too many string commands
 	// to lag other players.  If we decide that we want to stall
 	// the command, we will stop processing the rest of the packet,
@@ -2021,6 +2299,10 @@ void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
 		return;		// may have been kicked during the last usercmd
 	}
 
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessUsercmd( cl - svs.clients, cmd );
+#endif
+
 	VM_Call( gvm, 1, GAME_CLIENT_THINK, cl - svs.clients );
 }
 
@@ -2038,7 +2320,11 @@ each of the backup packets.
 ==================
 */
 static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
+#ifdef ELITEFORCE
+	int			i;
+#else
 	int			i, key;
+#endif
 	int			cmdCount;
 	static const usercmd_t nullcmd = { 0 };
 	usercmd_t	cmds[MAX_PACKET_USERCMDS], *cmd;
@@ -2062,17 +2348,23 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 		return;
 	}
 
+#ifndef ELITEFORCE
 	// use the checksum feed in the key
 	key = sv.checksumFeed;
 	// also use the message acknowledge
 	key ^= cl->messageAcknowledge;
 	// also use the last acknowledged server command in the key
 	key ^= MSG_HashKey(cl->reliableCommands[ cl->reliableAcknowledge & (MAX_RELIABLE_COMMANDS-1) ], 32);
+#endif
 
 	oldcmd = &nullcmd;
 	for ( i = 0 ; i < cmdCount ; i++ ) {
 		cmd = &cmds[i];
+#ifdef ELITEFORCE
+		MSG_ReadDeltaUsercmd( msg, oldcmd, cmd );
+#else
 		MSG_ReadDeltaUsercmdKey( msg, key, oldcmd, cmd );
+#endif
 		oldcmd = cmd;
 	}
 
@@ -2084,6 +2376,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	// if this is the first usercmd we have received
 	// this gamestate, put the client into the world
 	if ( cl->state == CS_PRIMED ) {
+#ifndef NEW_FILESYSTEM
 		if ( sv_pure->integer != 0 && !cl->gotCP ) {
 			// we didn't get a cp yet, don't assume anything and just send the gamestate all over again
 			if ( !SVC_RateLimit( &cl->gamestate_rate, 4, 1000 ) ) {
@@ -2092,10 +2385,12 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 			}
 			return;
 		}
+#endif
 		SV_ClientEnterWorld( cl, &cmds[0] );
 		// the moves can be processed normally
 	}
 
+#ifndef NEW_FILESYSTEM
 	// a bad cp command was sent, drop the client
 	if ( sv_pure->integer != 0 && !cl->pureAuthentic ) {
 #ifndef DEDICATED
@@ -2109,6 +2404,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 		SV_DropClient( cl, "Cannot validate pure client!" );
 		return;
 	}
+#endif
 
 	if ( cl->state != CS_ACTIVE ) {
 		cl->deltaMessage = cl->netchan.outgoingSequence - ( PACKET_BACKUP + 1 ); // force delta reset
@@ -2158,6 +2454,9 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	int	serverId;
 	int reliableAcknowledge;
 
+#ifdef ELITEFORCE
+	if(!msg->compat)
+#endif
 	MSG_Bitstream( msg );
 
 	serverId = MSG_ReadLong( msg );
@@ -2226,6 +2525,13 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 			if ( !SVC_RateLimit( &cl->gamestate_rate, 4, 1000 ) ) {
 				if ( cl->gentity )
 					Com_DPrintf( "%s: dropped gamestate, resending\n", cl->name );
+#ifdef STEF_LOGGING_DEFS
+				Logging_Printf(LP_INFO, "SERVERSTATE",
+					"NLOG Sending gamestate for client %i due to primary trigger: state(%i) msg_serverId(%i) sv_serverId(%i) "
+					"restarted_serverId(%i) messageAcknowledge(%i) gamestateMessageNum(%i)\n",
+					(int)(cl-svs.clients), cl->state, serverId, sv.serverId, sv.restartedServerId, cl->messageAcknowledge,
+					cl->gamestateMessageNum);
+#endif
 				SV_SendClientGameState( cl );
 			}
 		}
@@ -2242,6 +2548,11 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	// read optional clientCommand strings
 	do {
 		c = MSG_ReadByte( msg );
+#ifdef ELITEFORCE
+		if ( msg->compat && c == -1 ) {
+			c = clc_EOF;
+		}
+#endif
 		if ( c != clc_clientCommand ) {
 			break;
 		}
@@ -2252,6 +2563,13 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 			return;	// disconnect command
 		}
 	} while ( 1 );
+
+#ifdef STEF_MAP_RESTART_STATIC_SERVERID
+	if ( cl->mapRestartNetchanSequence && cl->messageAcknowledge < cl->mapRestartNetchanSequence ) {
+		// Skip movement commands from before the map restart
+		return;
+	}
+#endif
 
 	// read the usercmd_t
 	if ( c == clc_move ) {

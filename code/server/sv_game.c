@@ -359,11 +359,26 @@ The module is making a system call
 ====================
 */
 static intptr_t SV_GameSystemCalls( intptr_t *args ) {
+#ifdef STEF_VM_EXTENSIONS
+	intptr_t retval = 0;
+	if ( VMExt_HandleVMSyscall( args, VM_GAME, gvm, VM_ArgPtr, &retval ) ) {
+		return retval;
+	}
+#endif
 	switch( args[0] ) {
 	case G_PRINT:
 		Com_Printf( "%s", (const char*)VMA(1) );
 		return 0;
 	case G_ERROR:
+#ifdef STEF_IGNORE_STARTSOLID_ERROR
+	{
+		const char *error = VMA( 1 );
+		if ( !strncmp( error, "FinishSpawningItem", 18 ) && Q_stristr( error, "startsolid" ) ) {
+				Com_Printf( "NOTE: Skipping VM startsolid error '%s'\n", error );
+				return 0;
+		}
+	}
+#endif
 		Com_Error( ERR_DROP, "%s", (const char*)VMA(1) );
 		return 0;
 	case G_MILLISECONDS:
@@ -390,6 +405,15 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		Cmd_ArgvBuffer( args[1], VMA(2), args[3] );
 		return 0;
 	case G_SEND_CONSOLE_COMMAND:
+#ifdef STEF_LUA_SERVER
+		if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_GAME_MODULE_CONSOLECMD ) ) {
+			Stef_Lua_PushInteger( "exec_type", args[1] );
+			Stef_Lua_PushString( "cmd", (const char *)VMA( 2 ) );
+			if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+				return 0;
+			}
+		}
+#endif
 		Cbuf_ExecuteText( args[1], VMA(2) );
 		return 0;
 
@@ -407,8 +431,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case G_FS_FCLOSE_FILE:
 		FS_VM_CloseFile( args[1], H_QAGAME );
 		return 0;
+#ifndef ELITEFORCE
 	case G_FS_SEEK:
 		return FS_VM_SeekFile( args[1], args[2], args[3], H_QAGAME );
+#endif
 
 	case G_FS_GETFILELIST:
 		VM_CHECKBOUNDS( gvm, args[3], args[4] );
@@ -421,6 +447,15 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		SV_GameDropClient( args[1], VMA(2) );
 		return 0;
 	case G_SEND_SERVER_COMMAND:
+#ifdef STEF_LUA_SERVER
+		if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_GAME_MODULE_SERVERCMD ) ) {
+			Stef_Lua_PushInteger( "client", args[1] );
+			Stef_Lua_PushString( "cmd", (const char *)VMA( 2 ) );
+			if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+				return 0;
+			}
+		}
+#endif
 		SV_GameSendServerCommand( args[1], VMA(2) );
 		return 0;
 	case G_LINKENTITY:
@@ -430,18 +465,30 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		SV_UnlinkEntity( VMA(1) );
 		return 0;
 	case G_ENTITIES_IN_BOX:
+#ifdef STEF_VM_BOUNDS_FIXES
+		if ( args[4] == 1024 ) {
+			// Patch for g_weapon.c->SeekerAcquiresTarget. Call is made with maxcount 1024,
+			// when actual buffer size is 128 entries.
+			VM_CHECKBOUNDS( gvm, args[3], 128 * sizeof( int ) );
+			return SV_AreaEntities( VMA(1), VMA(2), VMA(3), 128 );
+		}
+#endif
 		VM_CHECKBOUNDS( gvm, args[3], args[4] * sizeof( int ) );
 		return SV_AreaEntities( VMA(1), VMA(2), VMA(3), args[4] );
 	case G_ENTITY_CONTACT:
 		return SV_EntityContact( VMA(1), VMA(2), VMA(3), /*int capsule*/ qfalse );
+#ifndef ELITEFORCE
 	case G_ENTITY_CONTACTCAPSULE:
 		return SV_EntityContact( VMA(1), VMA(2), VMA(3), /*int capsule*/ qtrue );
+#endif
 	case G_TRACE:
 		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
 		return 0;
+#ifndef ELITEFORCE
 	case G_TRACECAPSULE:
 		SV_Trace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
 		return 0;
+#endif
 	case G_POINT_CONTENTS:
 		return SV_PointContents( VMA(1), args[2] );
 	case G_SET_BRUSH_MODEL:
@@ -512,11 +559,13 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case G_DEBUG_POLYGON_DELETE:
 		BotImport_DebugPolygonDelete( args[1] );
 		return 0;
+#ifndef ELITEFORCE
 	case G_REAL_TIME:
 		return Com_RealTime( VMA(1) );
 	case G_SNAPVECTOR:
 		Sys_SnapVector( VMA(1) );
 		return 0;
+#endif
 
 		//====================================
 
@@ -530,6 +579,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		VM_CHECKBOUNDS( gvm, args[2], args[3] );
 		return botlib_export->BotLibVarGet( VMA(1), VMA(2), args[3] );
 
+#ifdef ELITEFORCE
+	case BOTLIB_DEFINE:
+		return botlib_export->PC_AddGlobalDefine( VMA(1) );
+#else
 	case BOTLIB_PC_ADD_GLOBAL_DEFINE:
 		return botlib_export->PC_AddGlobalDefine( VMA(1) );
 	case BOTLIB_PC_LOAD_SOURCE:
@@ -541,6 +594,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return botlib_export->PC_ReadTokenHandle( args[1], VMA(2) );
 	case BOTLIB_PC_SOURCE_FILE_AND_LINE:
 		return botlib_export->PC_SourceFileAndLine( args[1], VMA(2), VMA(3) );
+#endif
 
 	case BOTLIB_START_FRAME:
 		return botlib_export->BotLibStartFrame( VMF(1) );
@@ -566,12 +620,14 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		}
 		return 0;
 
+#ifndef ELITEFORCE
 	case BOTLIB_AAS_BBOX_AREAS:
 		return botlib_export->aas.AAS_BBoxAreas( VMA(1), VMA(2), VMA(3), args[4] );
 	case BOTLIB_AAS_AREA_INFO:
 		return botlib_export->aas.AAS_AreaInfo( args[1], VMA(2) );
 	case BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL:
 		return botlib_export->aas.AAS_AlternativeRouteGoals( VMA(1), args[2], VMA(3), args[4], args[5], VMA(6), args[7], args[8] );
+#endif
 	case BOTLIB_AAS_ENTITY_INFO:
 		botlib_export->aas.AAS_EntityInfo( args[1], VMA(2) );
 		return 0;
@@ -586,8 +642,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case BOTLIB_AAS_POINT_AREA_NUM:
 		return botlib_export->aas.AAS_PointAreaNum( VMA(1) );
+#ifndef ELITEFORCE
 	case BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX:
 		return botlib_export->aas.AAS_PointReachabilityAreaIndex( VMA(1) );
+#endif
 	case BOTLIB_AAS_TRACE_AREAS:
 		return botlib_export->aas.AAS_TraceAreas( VMA(1), VMA(2), VMA(3), VMA(4), args[5] );
 
@@ -610,10 +668,12 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA:
 		return botlib_export->aas.AAS_AreaTravelTimeToGoalArea( args[1], VMA(2), args[3], args[4] );
+#ifndef ELITEFORCE
 	case BOTLIB_AAS_ENABLE_ROUTING_AREA:
 		return botlib_export->aas.AAS_EnableRoutingArea( args[1], args[2] );
 	case BOTLIB_AAS_PREDICT_ROUTE:
 		return botlib_export->aas.AAS_PredictRoute( VMA(1), args[2], VMA(3), args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11] );
+#endif
 
 	case BOTLIB_AAS_SWIMMING:
 		return botlib_export->aas.AAS_Swimming( VMA(1) );
@@ -631,9 +691,11 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		botlib_export->ea.EA_Command( args[1], VMA(2) );
 		return 0;
 
+#ifndef ELITEFORCE
 	case BOTLIB_EA_ACTION:
 		botlib_export->ea.EA_Action( args[1], args[2] );
 		return 0;
+#endif
 	case BOTLIB_EA_GESTURE:
 		botlib_export->ea.EA_Gesture( args[1] );
 		return 0;
@@ -698,7 +760,11 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case BOTLIB_AI_LOAD_CHARACTER:
+#ifdef ELITEFORCE
+		return botlib_export->ai.BotLoadCharacter( VMA(1), args[2] );
+#else
 		return botlib_export->ai.BotLoadCharacter( VMA(1), VMF(2) );
+#endif
 	case BOTLIB_AI_FREE_CHARACTER:
 		botlib_export->ai.BotFreeCharacter( args[1] );
 		return 0;
@@ -766,7 +832,11 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		botlib_export->ai.BotSetChatGender( args[1], args[2] );
 		return 0;
 	case BOTLIB_AI_SET_CHAT_NAME:
+#ifdef ELITEFORCE
+		botlib_export->ai.BotSetChatName( args[1], VMA(2));
+#else
 		botlib_export->ai.BotSetChatName( args[1], VMA(2), args[3] );
+#endif
 		return 0;
 
 	case BOTLIB_AI_RESET_GOAL_STATE:
@@ -817,9 +887,11 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return botlib_export->ai.BotGetMapLocationGoal( VMA(1), VMA(2) );
 	case BOTLIB_AI_AVOID_GOAL_TIME:
 		return FloatAsInt( botlib_export->ai.BotAvoidGoalTime( args[1], args[2] ) );
+#ifndef ELITEFORCE
 	case BOTLIB_AI_SET_AVOID_GOAL_TIME:
 		botlib_export->ai.BotSetAvoidGoalTime( args[1], args[2], VMF(3));
 		return 0;
+#endif
 	case BOTLIB_AI_INIT_LEVEL_ITEMS:
 		botlib_export->ai.BotInitLevelItems();
 		return 0;
@@ -849,9 +921,11 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case BOTLIB_AI_RESET_MOVE_STATE:
 		botlib_export->ai.BotResetMoveState( args[1] );
 		return 0;
+#ifndef ELITEFORCE
 	case BOTLIB_AI_ADD_AVOID_SPOT:
 		botlib_export->ai.BotAddAvoidSpot( args[1], VMA(2), VMF(3), args[4] );
 		return 0;
+#endif
 	case BOTLIB_AI_MOVE_TO_GOAL:
 		botlib_export->ai.BotMoveToGoal( VMA(1), args[2], VMA(3), args[4] );
 		return 0;
@@ -896,6 +970,24 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION:
 		return botlib_export->ai.GeneticParentsAndChildSelection(args[1], VMA(2), VMA(3), VMA(4), VMA(5));
+
+#ifdef ELITEFORCE
+	case BOTLIB_EA_USE_ITEM:
+		botlib_export->ea.EA_UseItem(args[1], VMA(2));
+		return 0;
+	case BOTLIB_EA_DROP_ITEM:
+		botlib_export->ea.EA_DropItem(args[1], VMA(2));
+		return 0;
+	case BOTLIB_EA_USE_INV:
+		botlib_export->ea.EA_UseInv(args[1], VMA(2));
+		return 0;
+	case BOTLIB_EA_DROP_INV:
+		botlib_export->ea.EA_DropInv(args[1], VMA(2));
+		return 0;
+	case BOTLIB_EA_ALT_ATTACK:
+		botlib_export->ea.EA_AltAttack( args[1] );
+		return 0;
+#endif
 
 	// shared syscalls
 
@@ -993,6 +1085,9 @@ Called every time a map changes
 ===============
 */
 void SV_ShutdownGameProgs( void ) {
+#ifdef STEF_SERVER_RECORD
+	Record_ProcessGameShutdown();
+#endif
 	if ( !gvm ) {
 		return;
 	}
@@ -1014,7 +1109,11 @@ static void SV_InitGameVM( qboolean restart ) {
 	int		i;
 
 	// start the entity parsing at the beginning
+#ifdef STEF_LUA_SUPPORT
+	sv.entityParsePoint = SV_Lua_GetEntityString( qfalse );
+#else
 	sv.entityParsePoint = CM_EntityString();
+#endif
 
 	// clear all gentity pointers that might still be set from
 	// a previous level
@@ -1024,6 +1123,10 @@ static void SV_InitGameVM( qboolean restart ) {
 		svs.clients[i].gentity = NULL;
 	}
 	
+#ifdef STEF_SUPPORT_STATUS_SCORES_OVERRIDE
+	SV_StatusScoresOverride_Reset();
+#endif
+
 	// use the current msec count for a random seed
 	// init for this gamestate
 	VM_Call( gvm, 3, GAME_INIT, sv.time, Com_Milliseconds(), restart );

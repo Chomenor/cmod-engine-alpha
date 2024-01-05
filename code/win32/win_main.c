@@ -241,6 +241,7 @@ DIRECTORY SCANNING
 ==============================================================
 */
 
+#ifndef NEW_FILESYSTEM
 void Sys_ListFilteredFiles( const char *basedir, const char *subdirs, const char *filter, char **list, int *numfiles ) {
 	char		search[MAX_OSPATH*2+1];
 	char		newsubdirs[MAX_OSPATH*2];
@@ -287,6 +288,7 @@ void Sys_ListFilteredFiles( const char *basedir, const char *subdirs, const char
 
 	_findclose (findhandle);
 }
+#endif
 
 
 /*
@@ -315,6 +317,7 @@ void Sys_Sleep( int msec ) {
 }
 
 
+#ifndef NEW_FILESYSTEM
 /*
 =============
 Sys_ListFiles
@@ -447,6 +450,7 @@ void Sys_FreeFileList( char **list ) {
 
 	Z_Free( list );
 }
+#endif
 
 
 /*
@@ -489,15 +493,19 @@ Sys_LoadLibrary
 */
 void *Sys_LoadLibrary( const char *name )
 {
+#ifndef NEW_FILESYSTEM
 	const char *ext;
 
+#endif
 	if ( !name || !*name )
 		return NULL;
 
+#ifndef NEW_FILESYSTEM
 	if ( FS_AllowedExtension( name, qfalse, &ext ) )
 	{
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
+#endif
 
 	return (void *)LoadLibrary( AtoW( name ) );
 }

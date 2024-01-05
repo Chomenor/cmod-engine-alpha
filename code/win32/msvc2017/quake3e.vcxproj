@@ -129,6 +129,7 @@
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -153,6 +154,7 @@
       <WarningLevel>Level3</WarningLevel>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -177,6 +179,7 @@
       <WarningLevel>Level3</WarningLevel>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile />
     <Link>
@@ -198,6 +201,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <AdditionalDependencies>comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;..\..\libcurl\windows\vs2017\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -224,6 +228,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
@@ -249,6 +254,7 @@
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>$(ProjectDir)/../../../code/eliteforce/stef_config.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
@@ -289,6 +295,88 @@
     <ClCompile Include="..\..\client\snd_mem.c" />
     <ClCompile Include="..\..\client\snd_mix.c" />
     <ClCompile Include="..\..\client\snd_wavelet.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lapi.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lauxlib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lbaselib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lcode.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lcorolib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lctype.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ldblib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ldebug.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ldo.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ldump.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lfunc.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lgc.c" />
+    <ClCompile Include="..\..\eliteforce\lua\linit.c" />
+    <ClCompile Include="..\..\eliteforce\lua\liolib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\llex.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lmathlib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lmem.c" />
+    <ClCompile Include="..\..\eliteforce\lua\loadlib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lobject.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lopcodes.c" />
+    <ClCompile Include="..\..\eliteforce\lua\loslib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lparser.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lstate.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lstring.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lstrlib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ltable.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ltablib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\ltm.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lundump.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lutf8lib.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lvm.c" />
+    <ClCompile Include="..\..\eliteforce\lua\lzio.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_bit.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_decoder.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_fixed.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_frame.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_layer12.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_layer3.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_madhuffman.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_stream.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_synth.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_timer.c" />
+    <ClCompile Include="..\..\eliteforce\mad\mad_version.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_lua.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_misc.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_common.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_convert.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_main.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_spectator.c" />
+    <ClCompile Include="..\..\eliteforce\server\stef_sv_record_writer.c" />
+    <ClCompile Include="..\..\eliteforce\snd_codec_mp3.c" />
+    <ClCompile Include="..\..\eliteforce\stef_common.c" />
+    <ClCompile Include="..\..\eliteforce\stef_logging.c" />
+    <ClCompile Include="..\..\eliteforce\stef_lua.c" />
+    <ClCompile Include="..\..\eliteforce\stef_misc.c" />
+    <ClCompile Include="..\..\eliteforce\vm_extensions.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_cache.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_crosshair.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_gameparse.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_iteration.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_main.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_md4.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_misc.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_os.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_pk3.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_sha256.c" />
+    <ClCompile Include="..\..\filesystem\fscore\fsc_shader.c" />
+    <ClCompile Include="..\..\filesystem\fs_commands.c" />
+    <ClCompile Include="..\..\filesystem\fs_download.c" />
+    <ClCompile Include="..\..\filesystem\fs_fileio.c" />
+    <ClCompile Include="..\..\filesystem\fs_filelist.c" />
+    <ClCompile Include="..\..\filesystem\fs_lookup.c" />
+    <ClCompile Include="..\..\filesystem\fs_main.c" />
+    <ClCompile Include="..\..\filesystem\fs_misc.c" />
+    <ClCompile Include="..\..\filesystem\fs_reference.c" />
+    <ClCompile Include="..\..\filesystem\fs_trusted_vms.c" />
+    <ClCompile Include="..\..\filesystem\zlib\adler32.c" />
+    <ClCompile Include="..\..\filesystem\zlib\crc32.c" />
+    <ClCompile Include="..\..\filesystem\zlib\inffast.c" />
+    <ClCompile Include="..\..\filesystem\zlib\inflate.c" />
+    <ClCompile Include="..\..\filesystem\zlib\inftrees.c" />
+    <ClCompile Include="..\..\filesystem\zlib\zutil.c" />
     <ClCompile Include="..\..\qcommon\cmd.c" />
     <ClCompile Include="..\..\qcommon\cm_load.c" />
     <ClCompile Include="..\..\qcommon\cm_patch.c" />
@@ -369,6 +457,66 @@
     <ClInclude Include="..\..\client\keys.h" />
     <ClInclude Include="..\..\client\snd_local.h" />
     <ClInclude Include="..\..\client\snd_public.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lapi.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lauxlib.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lcode.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lctype.h" />
+    <ClInclude Include="..\..\eliteforce\lua\ldebug.h" />
+    <ClInclude Include="..\..\eliteforce\lua\ldo.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lfunc.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lgc.h" />
+    <ClInclude Include="..\..\eliteforce\lua\ljumptab.h" />
+    <ClInclude Include="..\..\eliteforce\lua\llex.h" />
+    <ClInclude Include="..\..\eliteforce\lua\llimits.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lmem.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lobject.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lopcodes.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lopnames.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lparser.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lprefix.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lstate.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lstring.h" />
+    <ClInclude Include="..\..\eliteforce\lua\ltable.h" />
+    <ClInclude Include="..\..\eliteforce\lua\ltm.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lua.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lua.hpp" />
+    <ClInclude Include="..\..\eliteforce\lua\luaconf.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lualib.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lundump.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lvm.h" />
+    <ClInclude Include="..\..\eliteforce\lua\lzio.h" />
+    <ClInclude Include="..\..\eliteforce\lua\stef_interface.h" />
+    <ClInclude Include="..\..\eliteforce\mad\bit.h" />
+    <ClInclude Include="..\..\eliteforce\mad\config.h" />
+    <ClInclude Include="..\..\eliteforce\mad\decoder.h" />
+    <ClInclude Include="..\..\eliteforce\mad\fixed.h" />
+    <ClInclude Include="..\..\eliteforce\mad\frame.h" />
+    <ClInclude Include="..\..\eliteforce\mad\global.h" />
+    <ClInclude Include="..\..\eliteforce\mad\layer12.h" />
+    <ClInclude Include="..\..\eliteforce\mad\layer3.h" />
+    <ClInclude Include="..\..\eliteforce\mad\mad.h" />
+    <ClInclude Include="..\..\eliteforce\mad\madhuffman.h" />
+    <ClInclude Include="..\..\eliteforce\mad\stream.h" />
+    <ClInclude Include="..\..\eliteforce\mad\synth.h" />
+    <ClInclude Include="..\..\eliteforce\mad\timer.h" />
+    <ClInclude Include="..\..\eliteforce\mad\version.h" />
+    <ClInclude Include="..\..\eliteforce\server\stef_sv_general.h" />
+    <ClInclude Include="..\..\eliteforce\server\stef_sv_record_local.h" />
+    <ClInclude Include="..\..\eliteforce\stef_config.h" />
+    <ClInclude Include="..\..\eliteforce\stef_cvar_defs.h" />
+    <ClInclude Include="..\..\eliteforce\stef_general.h" />
+    <ClInclude Include="..\..\eliteforce\stef_logging.h" />
+    <ClInclude Include="..\..\filesystem\fscore\fscore.h" />
+    <ClInclude Include="..\..\filesystem\fslocal.h" />
+    <ClInclude Include="..\..\filesystem\fspublic.h" />
+    <ClInclude Include="..\..\filesystem\zlib\crc32.h" />
+    <ClInclude Include="..\..\filesystem\zlib\inffast.h" />
+    <ClInclude Include="..\..\filesystem\zlib\inffixed.h" />
+    <ClInclude Include="..\..\filesystem\zlib\inflate.h" />
+    <ClInclude Include="..\..\filesystem\zlib\inftrees.h" />
+    <ClInclude Include="..\..\filesystem\zlib\zconf.h" />
+    <ClInclude Include="..\..\filesystem\zlib\zlib.h" />
+    <ClInclude Include="..\..\filesystem\zlib\zutil.h" />
     <ClInclude Include="..\..\game\bg_public.h" />
     <ClInclude Include="..\..\game\g_public.h" />
     <ClInclude Include="..\..\qcommon\cm_local.h" />

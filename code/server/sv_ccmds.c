@@ -157,24 +157,46 @@ static void SV_Map_f( void ) {
 	qboolean	killBots, cheat;
 	char		expanded[MAX_QPATH];
 	char		mapname[MAX_QPATH];
+#ifndef NEW_FILESYSTEM
 	int			len;
+#endif
 
 	map = Cmd_Argv(1);
 	if ( !map || !*map ) {
 		return;
 	}
 
+#ifdef STEF_LUA_SERVER
+	if ( SV_Lua_GetResourcePath( "bsp", NULL, 0 ) ) {
+		// If map path is being overridden by lua script, skip the existance check. The lua
+		// script is responsible for performing any checks that the map is valid to load.
+		goto skipCheck;
+	}
+#endif
 	// make sure the level exists before trying to change, so that
 	// a typo at the server console won't end the game
 	Com_sprintf( expanded, sizeof( expanded ), "maps/%s.bsp", map );
+#ifdef NEW_FILESYSTEM
+	// Refresh in case a map was just manually added.
+	FS_AutoRefresh();
+
+	// Perform the check without respect to current connected pure list.
+	// If we go forward loading the map, the pure list will be cleared in SV_SpawnServer
+	// before further access to the bsp.
+	if ( !FS_GeneralLookup( expanded, LOOKUPFLAG_IGNORE_PURE_LIST | LOOKUPFLAG_IGNORE_CURRENT_MAP, qfalse ) ) {
+#else
 	// bypass pure check so we can open downloaded map
 	FS_BypassPure();
 	len = FS_FOpenFileRead( expanded, NULL, qfalse );
 	FS_RestorePure();
 	if ( len == -1 ) {
+#endif
 		Com_Printf( "Can't find map %s\n", expanded );
 		return;
 	}
+#ifdef STEF_LUA_SERVER
+	skipCheck:
+#endif
 
 	// force latched values to get set
 	Cvar_Get ("g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH );
@@ -284,14 +306,29 @@ static void SV_MapRestart_f( void ) {
 		return;
 	}
 
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_PRE_MAP_RESTART );
+#endif
+
 	// toggle the server bit so clients can detect that a
 	// map_restart has happened
 	svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
 
+#ifdef STEF_MAP_RESTART_STATIC_SERVERID
+	// Save the netchan sequence so we can drop incoming client movement commands from before the
+	// map restart was received by the client. I'm not sure this is really necessary, but it should
+	// be technically more consistent with the original behavior.
+	for ( i = 0; i < sv_maxclients->integer; ++i ) {
+		if ( svs.clients[i].state == CS_ACTIVE ) {
+			svs.clients[i].mapRestartNetchanSequence = svs.clients[i].netchan.outgoingSequence;
+		}
+	}
+#else
 	// generate a new serverid	
 	// TTimo - don't update restartedserverId there, otherwise we won't deal correctly with multiple map_restart
 	sv.serverId = com_frameTime;
 	Cvar_Set( "sv_serverid", va("%i", sv.serverId ) );
+#endif
 
 	// if a map_restart occurs while a client is changing maps, we need
 	// to give them the correct time so that when they finish loading
@@ -353,18 +390,23 @@ static void SV_MapRestart_f( void ) {
 
 		if ( client->state == CS_ACTIVE )
 			SV_ClientEnterWorld( client, &client->lastUsercmd );
+#ifndef STEF_MAP_RESTART_NO_LOADING_SPAWN
 		else {
 			// If we don't reset client->lastUsercmd and are restarting during map load,
 			// the client will hang because we'll use the last Usercmd from the previous map,
 			// which is wrong obviously.
 			SV_ClientEnterWorld( client, NULL );
 		}
+#endif
 	}
 
 	// run another frame to allow things to look at all the players
 	sv.time += 100;
 	VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
 	svs.time += 100;
+#ifdef STEF_LUA_SERVER
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_POST_MAP_RESTART );
+#endif
 }
 
 
@@ -1264,7 +1306,11 @@ static void SV_Status_f( void ) {
 
 		Com_Printf( "%2i ", i ); // id
 		ps = SV_GameClientNum( i );
+#ifdef STEF_SUPPORT_STATUS_SCORES_OVERRIDE
+		Com_Printf( "%5i ", SV_StatusScoresOverride_AdjustScore( ps->persistant[PERS_SCORE], i ) );
+#else
 		Com_Printf( "%5i ", ps->persistant[PERS_SCORE] );
+#endif
 
 		// ping/status
 		if ( cl->state == CS_PRIMED )

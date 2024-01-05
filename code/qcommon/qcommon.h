@@ -23,8 +23,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef _QCOMMON_H_
 #define _QCOMMON_H_
 
+#ifdef ELITEFORCE
+#ifdef MISSIONPACK
+#undef MISSIONPACK
+#endif
+#endif
+
 #include <sys/types.h>
 #include "cm_public.h"
+
+#ifdef NEW_FILESYSTEM
+#include "../filesystem/fspublic.h"
+#endif
 
 //Ignore __attribute__ on non-gcc/clang platforms
 #if !defined(__GNUC__) && !defined(__clang__)
@@ -62,6 +72,9 @@ typedef struct {
 	qboolean	allowoverflow;	// if false, do a Com_Error
 	qboolean	overflowed;		// set to true if the buffer size failed (with allowoverflow set)
 	qboolean	oob;			// raw out-of-band operation, no static huffman encoding/decoding
+#ifdef ELITEFORCE
+	qboolean	compat;			// Compatibility mode for old EliteForce servers.
+#endif
 	byte	*data;
 	int		maxsize;
 	int		maxbits;			// maxsize in bits, for overflow checks
@@ -113,6 +126,10 @@ float MSG_ReadAngle16 (msg_t *sb);
 void  MSG_ReadData(msg_t *sb, void *buffer, int size);
 int   MSG_ReadEntitynum(msg_t *sb);
 
+#ifdef ELITEFORCE
+void MSG_WriteDeltaUsercmd( msg_t *msg, usercmd_t *from, usercmd_t *to );
+void MSG_ReadDeltaUsercmd( msg_t *msg, const usercmd_t *from, usercmd_t *to );
+#endif
 void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, const usercmd_t *to );
 void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, usercmd_t *to );
 
@@ -224,7 +241,11 @@ qboolean	NET_Sleep( int timeout );
 
 #define MAX_DOWNLOAD_WINDOW		48	// ACK window of 48 download chunks. Cannot set this higher, or clients
 						// will overflow the reliable commands buffer
+#ifdef STEF_INCREASE_DOWNLOAD_BLOCK_SIZE
+#define MAX_DOWNLOAD_BLKSIZE		4096
+#else
 #define MAX_DOWNLOAD_BLKSIZE		1024	// 896 byte block chunks
+#endif
 
 #define NETCHAN_GENCHECKSUM(challenge, sequence) ((challenge) ^ ((sequence) * (challenge)))
 
@@ -282,10 +303,15 @@ PROTOCOL
 ==============================================================
 */
 
+#ifdef ELITEFORCE
+#define OLD_PROTOCOL_VERSION	24
+#define NEW_PROTOCOL_VERSION	26
+#else
 #define	OLD_PROTOCOL_VERSION	68
 // new protocol with UDP spoofing protection:
 #define	NEW_PROTOCOL_VERSION	71
 // 1.31 - 67
+#endif
 
 #define DEFAULT_PROTOCOL_VERSION	OLD_PROTOCOL_VERSION
 
@@ -294,6 +320,14 @@ PROTOCOL
 // NOTE: that stuff only works with two digits protocols
 extern const int demo_protocols[];
 
+#ifdef ELITEFORCE
+#define	UPDATE_SERVER_NAME		"motd.stef1.ravensoft.com"
+#define MASTER_SERVER_NAME		"master.stef1.ravensoft.com"
+#define	AUTHORIZE_SERVER_NAME	"authenticate.stef1.ravensoft.com"
+#define	PORT_AUTHORIZE			27953
+#define	PORT_MASTER				27953
+#define	PORT_UPDATE				27951
+#else
 #define	UPDATE_SERVER_NAME	"update.quake3arena.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
@@ -307,6 +341,7 @@ extern const int demo_protocols[];
 #define	PORT_UPDATE			27951
 #ifndef PORT_AUTHORIZE
 #define	PORT_AUTHORIZE		27952
+#endif
 #endif
 #define	PORT_SERVER			27960
 #define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
@@ -641,6 +676,7 @@ extern	int			cvar_modifiedFlags;
 
 unsigned int crc32_buffer( const byte *buf, unsigned int len );
 
+#ifndef NEW_FILESYSTEM
 /*
 ==============================================================
 
@@ -658,8 +694,12 @@ issues.
 #define FS_UI_REF		0x02
 #define FS_CGAME_REF	0x04
 // number of id paks that will never be autodownloaded from baseq3/missionpack
+#ifdef ELITEFORCE
+#define NUM_ID_PAKS		4
+#else
 #define NUM_ID_PAKS		9
 #define NUM_TA_PAKS		4
+#endif
 
 typedef enum {
 	H_SYSTEM,
@@ -680,12 +720,17 @@ typedef enum {
 
 #define	MAX_FOUND_FILES		0x5000
 
+#ifdef ELITEFORCE
+#define Q3CONFIG_CFG "hmconfig.cfg"
+#define CONSOLE_HISTORY_FILE "hmhistory"
+#else
 #ifdef DEDICATED
 #define Q3CONFIG_CFG "q3config_server.cfg"
 #define CONSOLE_HISTORY_FILE "q3history_server"
 #else
 #define Q3CONFIG_CFG "q3config.cfg"
 #define CONSOLE_HISTORY_FILE "q3history"
+#endif
 #endif
 
 typedef	time_t fileTime_t;
@@ -871,6 +916,7 @@ char *FS_CopyString( const char *in );
 
 fileHandle_t FS_PipeOpenWrite( const char *cmd, const char *filename );
 void FS_PipeClose( fileHandle_t f );
+#endif
 
 
 /*
@@ -970,7 +1016,9 @@ int			Com_Split( char *in, char **out, int outsz, int delim );
 
 int			Com_Filter( const char *filter, const char *name );
 qboolean	Com_FilterExt( const char *filter, const char *name );
+#ifndef NEW_FILESYSTEM
 qboolean	Com_HasPatterns( const char *str );
+#endif
 int			Com_FilterPath( const char *filter, const char *name );
 int			Com_RealTime(qtime_t *qtime);
 qboolean	Com_SafeMode( void );
@@ -1349,5 +1397,9 @@ int HuffmanGetSymbol( unsigned int* symbol, const byte* buffer, int bitIndex );
 
 // functional gate syscall number
 #define COM_TRAP_GETVALUE 700
+
+#ifdef STEF_COMMON_HEADERS
+#include "../eliteforce/stef_general.h"
+#endif
 
 #endif // _QCOMMON_H_

@@ -22,6 +22,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __TR_PUBLIC_H
 #define __TR_PUBLIC_H
 
+#ifdef NEW_FILESYSTEM
+typedef struct fsc_file_s fsc_file_t;
+typedef struct fsc_shader_s fsc_shader_t;
+#define LOOKUPFLAG_ENABLE_DDS 1		// Enable dds format for image lookups. Must match value in fspublic.h!
+#endif
+
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
@@ -57,6 +63,9 @@ typedef struct {
 	qhandle_t (*RegisterSkin)( const char *name );
 	qhandle_t (*RegisterShader)( const char *name );
 	qhandle_t (*RegisterShaderNoMip)( const char *name );
+#ifdef ELITEFORCE
+	qhandle_t (*RegisterShader3D)( const char *name );
+#endif
 	void	(*LoadWorld)( const char *name );
 
 	// the vis data is a large enough block of data that we go to the trouble
@@ -226,6 +235,15 @@ typedef struct {
 	void	(*VKimp_Shutdown)( qboolean unloadDLL );
 	void*	(*VK_GetInstanceProcAddr)( VkInstance instance, const char *name );
 	qboolean (*VK_CreateSurface)( VkInstance instance, VkSurfaceKHR *pSurface );
+
+#ifdef NEW_FILESYSTEM
+	const fsc_file_t *(*FS_GeneralLookup)( const char *name, int lookup_flags, qboolean debug );
+	const fsc_file_t *(*FS_ImageLookup)( const char *name, int lookup_flags, qboolean debug );
+	const fsc_shader_t *(*FS_ShaderLookup)( const char *name, int lookup_flags, qboolean debug );
+	char *(*FS_ReadShader)( const fsc_shader_t *shader );
+	const char *(*FS_GetFileExtension)( const fsc_file_t *file );
+	qboolean (*FS_CheckFilesFromSamePk3)( const fsc_file_t *file1, const fsc_file_t *file2 );
+#endif
 
 } refimport_t;
 

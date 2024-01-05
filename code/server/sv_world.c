@@ -213,6 +213,17 @@ void SV_LinkEntity( sharedEntity_t *gEnt ) {
 	float		*origin, *angles;
 	svEntity_t	*ent;
 
+#ifdef STEF_SHIELD_EFFECT_FIX
+	// Workaround for game code bug when creating EV_SHIELD_HIT event.
+	if ( gEnt->s.eType == 89 && !gEnt->r.contents && !gEnt->r.svFlags && VectorCompare( gEnt->r.currentOrigin, vec3_origin ) ) {
+		// 89 = ET_EVENTS + EV_SHIELD_HIT
+		int clientNum = gEnt->s.otherEntityNum;
+		if ( clientNum >= 0 && clientNum < sv_maxclients->integer && svs.clients[clientNum].gentity ) {
+			VectorCopy( svs.clients[clientNum].gentity->r.currentOrigin, gEnt->r.currentOrigin );
+		}
+	}
+#endif
+
 	ent = SV_SvEntityForGentity( gEnt );
 
 	if ( ent->worldSector ) {
@@ -222,7 +233,64 @@ void SV_LinkEntity( sharedEntity_t *gEnt ) {
 	// encode the size into the entityState_t for client prediction
 	if ( gEnt->r.bmodel ) {
 		gEnt->s.solid = SOLID_BMODEL;		// a solid_box will never create this value
+#ifdef ELITEFORCE
+	} else if ( gEnt->r.contents & ( CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_SHOTCLIP ) ) {
+		if(gEnt->r.svFlags & SVF_SHIELD_BBOX)
+		{
+			if(gEnt->s.time2 & (1 << 24))
+			{
+				i = gEnt->r.maxs[0];
+				if (i<1)
+					i = 1;
+				if (i>255)
+					i = 255;
+
+				// z is not symetric
+				j = -gEnt->r.mins[0];
+				if (j<1)
+					j = 1;
+				if (j>255)
+					j = 255;
+
+				// and z maxs can be negative...
+				k = gEnt->r.maxs[2];
+				if (k<1)
+					k = 1;
+				if (k>255)
+					k = 255;
+
+				gEnt->s.eFlags |= EF_SHIELD_BOX_X;
+			}
+			else
+			{
+				i = gEnt->r.maxs[1];
+				if (i<1)
+					i = 1;
+				if (i>255)
+					i = 255;
+
+				// z is not symetric
+				j = -gEnt->r.mins[1];
+				if (j<1)
+					j = 1;
+				if (j>255)
+					j = 255;
+
+				// and z maxs can be negative...
+				k = gEnt->r.maxs[2];
+				if (k<1)
+					k = 1;
+				if (k>255)
+					k = 255;
+
+				gEnt->s.eFlags |= EF_SHIELD_BOX_Y;
+			}
+		}
+		else
+		{
+#else
 	} else if ( gEnt->r.contents & ( CONTENTS_SOLID | CONTENTS_BODY ) ) {
+#endif
 		// assume that x/y are equal and symmetric
 		i = gEnt->r.maxs[0];
 		if (i<1)
@@ -243,6 +311,9 @@ void SV_LinkEntity( sharedEntity_t *gEnt ) {
 			k = 1;
 		if (k>255)
 			k = 255;
+#ifdef ELITEFORCE
+		}
+#endif
 
 		gEnt->s.solid = (k<<16) | (j<<8) | i;
 	} else {

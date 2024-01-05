@@ -897,6 +897,54 @@ static const imageExtToLoaderMap_t imageLoaders[] =
 
 static const int numImageLoaders = ARRAY_LEN( imageLoaders );
 
+#ifdef NEW_FILESYSTEM
+/*
+=================
+R_LoadImageNewFS
+=================
+*/
+static const char *R_LoadImageNewFS( const char *name, byte **pic, int *width, int *height ) {
+	static char localName[ MAX_QPATH ];
+	const fsc_file_t *file;
+	const char *extension;
+	int i;
+
+	// Default outputs
+	*pic = NULL;
+	*width = 0;
+	*height = 0;
+
+	Q_strncpyz( localName, name, sizeof( localName ) );
+
+	// Look up the file
+	COM_StripExtension( name, localName, MAX_QPATH );
+	file = ri.FS_ImageLookup( localName, 0, qfalse );
+	if ( !file ) {
+		return localName;
+	}
+
+	// Get extension
+	extension = ri.FS_GetFileExtension( file );
+	if ( extension[0] == '.' ) {
+		// Skip leading dot
+		extension = &extension[1];
+	}
+
+	for ( i = 0; i < numImageLoaders; ++i ) {
+		if ( !Q_stricmp( extension, imageLoaders[i].ext ) ) {
+			// NOTE: It would be better to change the image loaders to take the actual fsc_file_t instead of
+			//    a string. However this seems to work for now and should *probably* have the same results.
+			imageLoaders[i].ImageLoader( va( "%s.%s", localName, extension ), pic, width, height );
+			Com_sprintf( localName, sizeof( localName ), "%s.%s", localName, extension );
+			return localName;
+		}
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "WARNING: R_LoadImage got file with unknown extension from FS_ImageLookup" );
+	return localName;
+}
+#endif
+
 /*
 =================
 R_LoadImage
@@ -912,6 +960,12 @@ static const char *R_LoadImage( const char *name, byte **pic, int *width, int *h
 	//qboolean orgNameFailed = qfalse;
 	int orgLoader = -1;
 	int i;
+
+#ifdef NEW_FILESYSTEM
+	if ( tr.new_filesystem ) {
+		return R_LoadImageNewFS( name, pic, width, height );
+	}
+#endif
 
 	*pic = NULL;
 	*width = 0;
