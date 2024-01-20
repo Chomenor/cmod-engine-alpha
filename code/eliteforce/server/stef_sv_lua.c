@@ -30,8 +30,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 extern lua_State *stef_lua_state;
 
+qboolean sv_lua_running_client_command;
+
 #define SERVER_RUNNING ( sv.state != SS_DEAD )
 #define CLIENTNUM_VALID( clientNum ) ( SERVER_RUNNING && clientNum >= 0 && clientNum < sv_maxclients->integer )
+#define CLIENT_CONNECTED( clientNum ) ( CLIENTNUM_VALID( clientNum ) && svs.clients[clientNum].state >= CS_CONNECTED )
 
 void SV_SendClientGameState( client_t *client );
 
@@ -259,14 +262,13 @@ static int SV_Lua_SendServerCmd( lua_State *L ) {
 	const char *msg = lua_tostring( L, 2 );
 	client_t *cl = NULL;
 	if ( !msg ) {
-		Com_Printf( "lua sv.send_servercmd: invalid message\n" );
+		Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.send_servercmd: invalid message\n" );
 		return 0;
 	}
 	if ( !lua_isnil( L, 1 ) ) {
 		int clientNum = lua_tointegerx( L, 1, &clientValid );
-		if ( !clientValid || clientNum < 0 || clientNum >= sv_maxclients->integer ||
-				svs.clients[clientNum].state < CS_CONNECTED ) {
-			Com_Printf( "lua sv.send_servercmd: invalid client\n" );
+		if ( !clientValid || !CLIENT_CONNECTED( clientNum ) ) {
+			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.send_servercmd: invalid client\n" );
 			return 0;
 		}
 		cl = &svs.clients[clientNum];
@@ -283,12 +285,41 @@ SV_Lua_SendGamestate
 static int SV_Lua_SendGamestate( lua_State *L ) {
 	int clientValid = 0;
 	int clientNum = lua_tointegerx( L, 1, &clientValid );
-	if ( !clientValid || clientNum < 0 || clientNum >= sv_maxclients->integer ||
-			svs.clients[clientNum].state < CS_CONNECTED ) {
-		Com_Printf( "lua send_gamestate: invalid client\n" );
+	if ( !clientValid || !CLIENT_CONNECTED( clientNum ) ) {
+		Logging_Printf( LP_CONSOLE, "WARNINGS", "lua send_gamestate: invalid client\n" );
 		return 0;
 	}
 	SV_SendClientGameState( &svs.clients[clientNum] );
+	return 0;
+}
+
+/*
+=================
+SV_Lua_ExecClientCmd
+
+Run a command as if it was issued by a client. Bypasses flood protection.
+Will result in a SV_LUA_EVENT_CLIENT_COMMAND call back to Lua. Lua script is
+responsible for avoiding a loop if calling back from this event.
+=================
+*/
+static int SV_Lua_ExecClientCmd( lua_State *L ) {
+	const char *cmd = lua_tostring( L, 2 );
+	if ( !cmd ) {
+		Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.exec_client_cmd: invalid cmd\n" );
+	} else {
+		int clientValid = 0;
+		int clientNum = lua_tointegerx( L, 1, &clientValid );
+		if ( !clientValid || !CLIENT_CONNECTED( clientNum ) ) {
+			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.exec_client_cmd: invalid client\n" );
+		} else if ( sv_lua_running_client_command ) {
+			// shouldn't happen
+			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.exec_client_cmd: already running\n" );
+		} else {
+			sv_lua_running_client_command = qtrue;
+			SV_ExecuteClientCommand( &svs.clients[clientNum], cmd );
+			sv_lua_running_client_command = qfalse;
+		}
+	}
 	return 0;
 }
 
@@ -314,6 +345,7 @@ static void SV_Lua_SetupInterface( lua_State *L ) {
 	ADD_FUNCTION( "is_client_cs_ready", SV_Lua_IsClientCSReady );
 	ADD_FUNCTION( "send_servercmd", SV_Lua_SendServerCmd );
 	ADD_FUNCTION( "send_gamestate", SV_Lua_SendGamestate );
+	ADD_FUNCTION( "exec_client_cmd", SV_Lua_ExecClientCmd );
 
 	#define ADD_STRING_CONSTANT( name, value ) \
 		lua_pushstring( L, value ); \
@@ -392,7 +424,7 @@ qboolean SV_Lua_GamestateConfigstrings( int clientNum, msg_t *msg ) {
 					}
 					lua_pop( stef_lua_state, 1 );
 				}
-				Com_Printf( "gamestate cs override for client %i\n", clientNum );
+				Logging_Printf( LP_INFO, "SV_LUA_GAMESTATE", "gamestate cs override for client %i\n", clientNum );
 				override = qtrue;
 			}
 			lua_pop( stef_lua_state, 1 );
@@ -440,7 +472,8 @@ void SV_Lua_OpenDownload( int clientNum ) {
 					}
 					if ( cl->download == FS_INVALID_HANDLE ) {
 						// Abort download
-						Com_Printf( "WARNING: Lua script specified download path '%s', but the file could not be opened.\n", path );
+						Logging_Printf( LP_CONSOLE, "WARNINGS", "WARNING: Lua script specified download path '%s',"
+								" but the file could not be opened.\n", path );
 						SV_Lua_OpenDownloadError( &svs.clients[clientNum], "Server failed to open file for downloading." );
 						*cl->downloadName = '\0';
 					}
@@ -451,7 +484,8 @@ void SV_Lua_OpenDownload( int clientNum ) {
 					if ( lua_getfield( stef_lua_state, -2, "message" ) == LUA_TSTRING ) {
 						message = lua_tostring( stef_lua_state, -1 );
 					} else {
-						Com_Printf( "WARNING: Lua script specified error command, but no error message.\n" );
+						Logging_Printf( LP_CONSOLE, "WARNINGS", "WARNING: Lua script specified error command,"
+								" but no error message.\n" );
 					}
 					SV_Lua_OpenDownloadError( &svs.clients[clientNum], message );
 					*cl->downloadName = '\0';
@@ -462,7 +496,7 @@ void SV_Lua_OpenDownload( int clientNum ) {
 					*cl->downloadName = '\0';
 
 				} else if ( *cmd ) {
-					Com_Printf( "WARNING: Unrecognized Lua download command '%s'.\n", cmd );
+					Logging_Printf( LP_CONSOLE, "WARNINGS", "WARNING: Unrecognized Lua download command '%s'.\n", cmd );
 				}
 			}
 			lua_pop( stef_lua_state, 1 );

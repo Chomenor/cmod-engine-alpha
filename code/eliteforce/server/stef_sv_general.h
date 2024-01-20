@@ -57,6 +57,7 @@ qboolean Record_ProcessPacketEvent( const netadr_t *address, msg_t *msg, int qpo
 #define SV_LUA_EVENT_CLIENT_COMMAND "sv_client_cmd"
 #define SV_LUA_EVENT_PACKET_COMMAND "sv_packet_cmd"
 
+extern qboolean sv_lua_running_client_command;
 qboolean SV_Lua_SimpleClientEventCall( const char *name, int clientNum );
 qboolean SV_Lua_GamestateConfigstrings( int clientNum, msg_t *msg );
 void SV_Lua_OpenDownload( int clientNum );

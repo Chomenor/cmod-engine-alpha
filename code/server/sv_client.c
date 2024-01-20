@@ -1124,7 +1124,7 @@ static void SV_SendClientGameState( client_t *client ) {
 	// so at least try to inform him in console and release connection slot
 	if ( msg.overflowed ) {
 #ifdef STEF_LOGGING_DEFS
-		Logging_Printf( LP_INFO, "SERVER_WARNINGS SERVERSTATE", "Gamestate overflow for client %i", (int)( client - svs.clients ) );
+		Logging_Printf( LP_INFO, "WARNINGS SERVERSTATE", "Gamestate overflow for client %i", (int)( client - svs.clients ) );
 #endif
 		if ( client->netchan.remoteAddress.type == NA_LOOPBACK ) {
 			Com_Error( ERR_DROP, "gamestate overflow" );
@@ -2189,12 +2189,6 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 
 	Cmd_TokenizeString( s );
 
-#ifdef STEF_LUA_SERVER
-	if ( SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_CLIENT_COMMAND, cl - svs.clients ) ) {
-		return qtrue;
-	}
-#endif
-
 	// malicious users may try using too many string commands
 	// to lag other players.  If we decide that we want to stall
 	// the command, we will stop processing the rest of the packet,
@@ -2204,6 +2198,17 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 	// We don't do this when the client hasn't been active yet since it's
 	// normal to spam a lot of commands when downloading
 	bFloodProtect = cl->netchan.remoteAddress.type != NA_BOT && cl->state >= CS_ACTIVE;
+
+#ifdef STEF_LUA_SERVER
+	if ( sv_lua_running_client_command ) {
+		// command issued from lua
+		bFloodProtect = qfalse;
+	}
+	if ( SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_CLIENT_COMMAND, cl - svs.clients ) ) {
+		// command handled by lua
+		return qtrue;
+	}
+#endif
 
 	// see if it is a server level command
 	for ( ucmd = ucmds; ucmd->name; ucmd++ ) {
@@ -2526,11 +2531,11 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 				if ( cl->gentity )
 					Com_DPrintf( "%s: dropped gamestate, resending\n", cl->name );
 #ifdef STEF_LOGGING_DEFS
-				Logging_Printf(LP_INFO, "SERVERSTATE",
-					"NLOG Sending gamestate for client %i due to primary trigger: state(%i) msg_serverId(%i) sv_serverId(%i) "
+				Logging_Printf( LP_INFO, "SERVERSTATE",
+					"Sending gamestate for client %i due to primary trigger: state(%i) msg_serverId(%i) sv_serverId(%i) "
 					"restarted_serverId(%i) messageAcknowledge(%i) gamestateMessageNum(%i)\n",
-					(int)(cl-svs.clients), cl->state, serverId, sv.serverId, sv.restartedServerId, cl->messageAcknowledge,
-					cl->gamestateMessageNum);
+					(int)( cl - svs.clients ), cl->state, serverId, sv.serverId, sv.restartedServerId, cl->messageAcknowledge,
+					cl->gamestateMessageNum );
 #endif
 				SV_SendClientGameState( cl );
 			}

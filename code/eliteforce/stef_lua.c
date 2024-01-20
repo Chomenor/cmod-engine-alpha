@@ -149,19 +149,24 @@ Stef_Lua_RunFile
 */
 static int Stef_Lua_RunFile( lua_State *L ) {
 	const char *path = lua_tostring( L, 1 );
-	char *data = NULL;
-	int length = FS_ReadFile( path, (void **)&data );
-	if ( length > 0 ) {
-		if ( luaL_loadstring( L, data ) ) {
-			Com_Printf( "lua sys.runfile: error '%s'\n", lua_tostring( stef_lua_state, -1 ) );
-			lua_pop( L, 1 );
-			lua_pushnil( L );
-		} else {
-			lua_call( L, 0, 1 );
-		}
+	if ( !path ) {
+		lua_pushstring( L, "com.run_file invalid path parameter" );
+		lua_error( L );
 	} else {
-		Com_Printf( "lua sys.runfile: failed to read '%s'\n", path );
-		lua_pushnil( L );
+		char *data = NULL;
+		int length = FS_ReadFile( path, (void **)&data );
+		if ( length > 0 ) {
+			if ( luaL_loadstring( L, data ) ) {
+				lua_error( L );
+			} else {
+				lua_call( L, 0, 1 );
+			}
+		} else {
+			char buffer[256];
+			Com_sprintf( buffer, sizeof( buffer ), "com.run_file failed to read '%s'", path );
+			lua_pushstring( L, buffer );
+			lua_error( L );
+		}
 	}
 	return 1;
 }
@@ -273,6 +278,44 @@ static int Stef_Lua_CloseHandle( lua_State *L ) {
 	if ( handle > 0 ) {
 		FS_FCloseFile( handle );
 	}
+	return 0;
+}
+
+/*
+=================
+Stef_Lua_ListFiles
+=================
+*/
+static int Stef_Lua_ListFiles( lua_State *L ) {
+	const char *path = lua_tostring( L, 1 );
+	if ( !path ) {
+		lua_pushstring( L, "com.list_files invalid path parameter" );
+		lua_error( L );
+	} else {
+		int i;
+		int numFiles = 0;
+		const char **files = FS_ListFiles( path, lua_tostring( L, 2 ), &numFiles );
+		lua_createtable( L, numFiles, 0 );
+		for ( i = 0; i < numFiles; ++i ) {
+			lua_pushstring( L, files[i] );
+			lua_rawseti( L, -2, i + 1 );
+		}
+		FS_FreeFileList( files );
+	}
+	return 1;
+}
+
+/*
+=================
+Stef_Lua_FsAutoRefresh
+=================
+*/
+static int Stef_Lua_FsAutoRefresh( lua_State *L ) {
+#ifdef NEW_FILESYSTEM
+	FS_AutoRefresh();
+#else
+	Com_Printf( "Lua com.fs_auto_refresh failed due to build wthout NEW_FILESYSTEM.\n" );
+#endif
 	return 0;
 }
 
@@ -463,6 +506,8 @@ static void Stef_Lua_SetupInterface( lua_State *L ) {
 	ADD_FUNCTION( "handle_write", Stef_Lua_WriteHandle );
 	ADD_FUNCTION( "handle_flush", Stef_Lua_FlushHandle );
 	ADD_FUNCTION( "handle_close", Stef_Lua_CloseHandle );
+	ADD_FUNCTION( "list_files", Stef_Lua_ListFiles );
+	ADD_FUNCTION( "fs_auto_refresh", Stef_Lua_FsAutoRefresh );
 	ADD_FUNCTION( "cmd_exec", Stef_Lua_RunCmd );
 	ADD_FUNCTION( "cvar_get_string", Stef_Lua_CvarGetString );
 	ADD_FUNCTION( "cvar_get_integer", Stef_Lua_CvarGetInteger );

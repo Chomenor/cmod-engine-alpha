@@ -286,16 +286,12 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
 
-	if ( !com_developer || !com_developer->integer ) {
-		return;			// don't confuse non-developers with techie stuff...
-	}
-
-	va_start( argptr,fmt );
-	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
-	va_end( argptr );
-
 #ifdef STEF_LUA_EVENTS
 	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+		va_start( argptr, fmt );
+		Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
+		va_end( argptr );
+
 		// generate lua event with printlevel 1 (developer)
 		Stef_Lua_PushString( "text", msg );
 		Stef_Lua_PushInteger( "printlevel", 1 );
@@ -312,6 +308,14 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 		return;
 	}
 #endif
+
+	if ( !com_developer || !com_developer->integer ) {
+		return;			// don't confuse non-developers with techie stuff...
+	}
+
+	va_start( argptr,fmt );
+	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
+	va_end( argptr );
 
 	Com_Printf( S_COLOR_CYAN "%s", msg );
 }
