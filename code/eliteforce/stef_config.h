@@ -15,13 +15,21 @@
 // Common
 /* ******************************************************************************** */
 
-// [FEATURE] Support for various debug logging functionality
+// [FEATURE] Support for various debug logging functionality.
 #define STEF_LOGGING_SYSTEM
-#define STEF_LOGGING_DEFS
 
-// [FEATURE] Lua scripting support
+// [FEATURE] Additional logging statements.
+#if defined( STEF_LOGGING_SYSTEM )
+#define STEF_LOGGING_DEFS
+#endif
+
+// [FEATURE] Core Lua scripting support.
 #define STEF_LUA_SUPPORT
+
+// [FEATURE] Additional Lua event calls.
+#if defined( STEF_LUA_SUPPORT )
 #define STEF_LUA_EVENTS
+#endif
 
 // [TWEAK] Default settings tweaks
 // Used as a placeholder until the full settings system is ported.
@@ -172,6 +180,9 @@
 
 // [COMMON] VM extensions system for sharing additional functions with VM modules.
 #define STEF_VM_EXTENSIONS
+
+// [COMMON] Support basic log print functions even if STEF_LOGGING_SYSTEM is disabled.
+#define STEF_LOGGING_CORE
 
 /* ******************************************************************************** */
 // Misc

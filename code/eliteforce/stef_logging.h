@@ -21,21 +21,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifdef STEF_LOGGING_SYSTEM
+#if defined( STEF_LOGGING_SYSTEM ) || defined( STEF_LOGGING_CORE )
 typedef enum {
 	LP_INFO,		// Only log if conditions are met. Don't print to console by default.
 	LP_DEVELOPER,	// Print to console if developer is set to 1.
 	LP_CONSOLE,		// Always print to console.
 } loggingPrintType_t;
 
+void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg );
+void QDECL Logging_PrintfExt( loggingPrintType_t printType, const char *conditions, int entityNum, const char *fmt, ... );
+void QDECL Logging_Printf( loggingPrintType_t printType, const char *conditions, const char *fmt, ... );
+#endif
+
+#ifdef STEF_LOGGING_SYSTEM
 void Logging_FrameEntry( const char *log_conditions, const char *name, int entity_num, int info_value, qboolean reallocate_name );
 void Logging_FrameExit( const char *name );
 void QDECL Logging_RegisterCrash( const char *fmt, ... );
 int Logging_FrameCount( void );
 void Logging_FrameJump( int count, const char *reason );
-void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg );
-void QDECL Logging_PrintfExt( loggingPrintType_t printType, const char *conditions, int entityNum, const char *fmt, ... );
-void QDECL Logging_Printf( loggingPrintType_t printType, const char *conditions, const char *fmt, ... );
 void Logging_GetStack( char *buffer, unsigned int size );
 void Logging_PrintStack( loggingPrintType_t printType, const char *conditions );
 

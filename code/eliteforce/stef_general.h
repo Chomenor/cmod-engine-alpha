@@ -31,7 +31,7 @@ void Stef_CvarDefsInit(void);
 #undef CVAR_DEF
 #endif
 
-#ifdef STEF_LOGGING_SYSTEM
+#if defined( STEF_LOGGING_SYSTEM ) || defined( STEF_LOGGING_CORE )
 #include "stef_logging.h"
 #endif
 

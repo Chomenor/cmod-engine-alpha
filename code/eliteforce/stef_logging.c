@@ -21,10 +21,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifdef STEF_LOGGING_SYSTEM
+#if defined( STEF_LOGGING_SYSTEM ) || defined( STEF_LOGGING_CORE )
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 
+#ifdef STEF_LOGGING_SYSTEM
 #define MAX_LOGGING_FRAMES 64
 
 /* ******************************************************************************** */
@@ -253,6 +254,7 @@ void Logging_GetLuaFrameInfo( int frameNum ) {
 	}
 }
 #endif
+#endif
 
 /* ******************************************************************************** */
 // Event Logging
@@ -267,7 +269,7 @@ LP_DEVELOPER and LP_CONSOLE it must be included in the parameter.
 ==================
 */
 void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg ) {
-#ifdef STEF_LUA_EVENTS
+#if defined( STEF_LUA_EVENTS ) && defined( STEF_LOGGING_SYSTEM )
 	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
 		Stef_Lua_PushString( "text", msg );
 		Stef_Lua_PushInteger( "printlevel", printlevel >= LP_CONSOLE ? 2 : printlevel >= LP_DEVELOPER ? 1 : 0 );
