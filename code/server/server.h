@@ -222,6 +222,10 @@ typedef struct client_s {
 	char			tld[3]; // "XX\0"
 	const char		*country;
 
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+	int altSwapWeapons;
+	int altSwapSuspend;
+#endif
 #ifdef STEF_MAP_RESTART_STATIC_SERVERID
 	int mapRestartNetchanSequence;
 #endif

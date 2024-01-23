@@ -21,6 +21,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+// Enable handler for compatibility with client alt fire swap features.
+CVAR_DEF( sv_altSwapSupport, "1", CVAR_LATCH )
+#endif
+
 #ifdef STEF_MIN_SNAPS
 CVAR_DEF( sv_minSnaps, "50", CVAR_ARCHIVE );
 #endif

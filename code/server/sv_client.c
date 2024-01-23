@@ -2228,6 +2228,14 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 		}
 	}
 
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+	if ( sv_altSwapSupport->integer && !ucmd->name && !Q_stricmp( Cmd_Argv( 0 ), "setAltSwap" ) ) {
+		cl->altSwapWeapons = atoi( Cmd_Argv( 1 ) );
+		Logging_Printf( LP_INFO, "SV_ALTSWAP", "%i: %i", cl - svs.clients, cl->altSwapWeapons );
+		return qtrue;
+	}
+#endif
+
 #ifndef DEDICATED
 	if ( !com_cl_running->integer && bFloodProtect && SV_FloodProtect( cl ) ) {
 #else
@@ -2298,6 +2306,39 @@ Also called by bot code
 ==================
 */
 void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+	#define EF_BUTTON_ATTACK 1
+	#define EF_BUTTON_ALT_ATTACK 32
+
+	if ( cl->altSwapWeapons && cmd->serverTime > cl->lastUsercmd.serverTime ) {
+		const playerState_t *ps = SV_GameClientNum( cl - svs.clients );
+
+		// Disable alt swap during non-weapon states, and keep it suspended until buttons are
+		// released to avoid potential unwanted weapon fire on respawn
+		if ( ps->pm_type == 2 ||							// Spectator Mode
+				ps->eFlags & 0x00000400 ||					// Eliminated
+				ps->pm_flags & 4096 ||						// Spectator PMF_FOLLOW Mode
+				ps->pm_type == 3 || ps->pm_type == 5 ) {	// Dead/Intermission Scoreboard
+			cl->altSwapSuspend = cmd->buttons & ( EF_BUTTON_ALT_ATTACK | EF_BUTTON_ATTACK );
+		}
+
+		// Break out of suspend mode once buttons changed
+		else if ( cl->altSwapSuspend != ( cmd->buttons & ( EF_BUTTON_ALT_ATTACK | EF_BUTTON_ATTACK ) ) ) {
+			cl->altSwapSuspend = 0;
+		}
+
+		if ( !cl->altSwapSuspend && ps->weapon > 0 && ps->weapon < 31 &&
+				cl->altSwapWeapons & ( 1 << ( ps->weapon - 1 ) ) ) {
+			// Swap buttons
+			if ( cmd->buttons & EF_BUTTON_ALT_ATTACK ) {
+				cmd->buttons &= ~EF_BUTTON_ALT_ATTACK;
+				cmd->buttons |= EF_BUTTON_ATTACK;
+			} else if ( cmd->buttons & EF_BUTTON_ATTACK ) {
+				cmd->buttons |= ( EF_BUTTON_ATTACK | EF_BUTTON_ALT_ATTACK );
+			}
+		}
+	}
+#endif
 	cl->lastUsercmd = *cmd;
 
 	if ( cl->state != CS_ACTIVE ) {

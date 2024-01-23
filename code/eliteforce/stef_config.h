@@ -82,6 +82,11 @@
 // Elimination mode in cases where the score field is needed for round indicator features.
 #define STEF_SUPPORT_STATUS_SCORES_OVERRIDE
 
+// [FEATURE] Support server-side handler for client alt fire button swapping features.
+// Although it is possible for cgame to fall back on other methods (game module or client
+// engine) for alt swapping, this handler is the preferred and most reliable method.
+#define STEF_SERVER_ALT_SWAP_SUPPORT
+
 // [TWEAK] Disable auto-running or saving config files in dedicated server build.
 // Only settings manually specified using e.g. exec on command line are loaded.
 #if defined( DEDICATED )

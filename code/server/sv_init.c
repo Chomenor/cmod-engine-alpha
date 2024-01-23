@@ -756,6 +756,21 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	SV_SetConfigstring( CS_SERVERINFO, Cvar_InfoString( CVAR_SERVERINFO, NULL ) );
 	cvar_modifiedFlags &= ~CVAR_SERVERINFO;
 
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+	// unlatch cvar
+	Cvar_Get( "sv_altSwapSupport", "1", CVAR_LATCH );
+
+	for ( i = 0; i < sv_maxclients->integer; i++ ) {
+		// reset alt swap state
+		svs.clients[i].altSwapWeapons = 0;
+		svs.clients[i].altSwapSuspend = 0;
+	}
+
+	if ( sv_altSwapSupport->integer ) {
+		SV_SetConfigstring( 880, "!modcfg \\altSwapSupport\\1" );
+	}
+#endif
+
 	// any media configstring setting now should issue a warning
 	// and any configstring changes should be reliably transmitted
 	// to all clients

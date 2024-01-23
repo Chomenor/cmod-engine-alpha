@@ -172,6 +172,12 @@ static qboolean VMExt_CheckGetString( const char *command, char *buffer, unsigne
 		return qtrue;
 	}
 #endif
+#ifdef STEF_SERVER_ALT_SWAP_SUPPORT
+	if ( !Q_stricmp( command, "sv_support_setAltSwap" ) && sv_altSwapSupport->integer ) {
+		Q_strncpyz( buffer, "1", sizeof( buffer ) );
+		return qtrue;
+	}
+#endif
 
 	return qfalse;
 }
