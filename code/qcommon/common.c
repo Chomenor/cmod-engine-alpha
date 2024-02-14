@@ -4315,11 +4315,11 @@ void Com_WriteConfiguration( void ) {
 #ifndef DEDICATED
 #ifdef NEW_FILESYSTEM
 	basegame = Cvar_VariableString( "fs_basegame" );
-	if (UI_usesUniqueCDKey() && Q_stricmp(FS_GetCurrentGameDir(), basegame)) {
+	if ( UI_usesUniqueCDKey() && Q_stricmp( FS_GetCurrentGameDir(), basegame ) ) {
 		Com_WriteCDKey( FS_GetCurrentGameDir(), &cl_cdkey[16] );
 #else
-	gamedir = Cvar_VariableString( "fs_game" );
-	basegame = Cvar_VariableString( "fs_basegame" );
+	gamedir = FS_GetCurrentGameDir();
+	basegame = FS_GetBaseGameDir();
 	if ( UI_usesUniqueCDKey() && gamedir[0] && Q_stricmp( basegame, gamedir ) ) {
 		Com_WriteCDKey( gamedir, &cl_cdkey[16] );
 #endif
