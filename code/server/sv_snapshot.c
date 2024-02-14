@@ -820,6 +820,41 @@ void SV_SendClientMessages( void )
 			continue;
 		}
 
+#ifdef STEF_SNAPSHOT_DELTA_BUFFER_FIX
+		if ( c->compat ) {
+			int bufferUsage = 0;
+
+			if ( c->state == CS_ACTIVE && c->netchan.outgoingSequence - c->deltaMessage < ( PACKET_BACKUP - 3 ) ) {
+				const clientSnapshot_t *deltaFrame = &c->frames[c->deltaMessage & PACKET_MASK];
+				if ( deltaFrame->frameNum - svs.lastValidFrame >= 0 ) {
+					// Got valid delta frame according to SV_WriteSnapshotToClient conditions
+					// Now tally entity usage from delta frame up to current frame
+					int j;
+					for ( j = 0; j < PACKET_BACKUP; ++j ) {
+						int messageNum = c->deltaMessage + j;
+						const clientSnapshot_t *frame = &c->frames[messageNum & PACKET_MASK];
+						if ( messageNum >= c->netchan.outgoingSequence ) {
+							break;
+						}
+						if ( frame->frameNum >= deltaFrame->frameNum ) {
+							bufferUsage += frame->num_entities;
+						}
+					}
+				}
+			}
+
+			// Old clients (prior to ioq3 update in 2013) use MAX_PARSE_ENTITIES value of 2048 with
+			// CL_ParseSnapshot failing if the buffer usage ahead of the new snapshot is greater than
+			// MAX_PARSE_ENTITIES-128. I reduced the limit here to MAX_PARSE_ENTITIES-256 to be extra
+			// safe against theoretically possible (but probably unlikely) entity corruption.
+			if ( bufferUsage >= 2048 - 256 ) {
+				Logging_Printf( LP_INFO, "SV_DELTABUFFER", "Forcing non-delta snapshot %i for client "
+						"%i due to entity buffer usage %i", c->netchan.outgoingSequence, i, bufferUsage );
+				c->deltaMessage = c->netchan.outgoingSequence - ( PACKET_BACKUP + 1 );
+			}
+		}
+#endif
+
 		// generate and send a new message
 		SV_SendClientSnapshot( c );
 		c->lastSnapshotTime = svs.time;

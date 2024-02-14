@@ -150,6 +150,10 @@
 // being added in SV_AddServerCommand which can accumulate without being sent properly.
 #define STEF_DOWNLOAD_CONNECTION_STATE_FIX
 
+// [BUGFIX] Fix for "Delta parseEntitiesNum too old" errors in certain cases.
+// (40+ sv_fps value + 1.20 client + high ping/bad connection)
+#define STEF_SNAPSHOT_DELTA_BUFFER_FIX
+
 // [BUGFIX] Use alternative to changing serverid during map restarts.
 // This avoids the need for a systeminfo update during map restarts and potentially fixes
 // some intermittent buggy behavior seen in the EF 1.20 client.
