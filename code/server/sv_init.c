@@ -882,7 +882,7 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_privatePassword, "Set password for private clients to login with." );
 #ifdef ELITEFORCE
 #ifdef STEF_DEFAULT_SETTINGS_TWEAKS
-	sv_fps = Cvar_Get ("sv_fps", "30", CVAR_SYSTEMINFO | CVAR_TEMP);
+	sv_fps = Cvar_Get ("sv_fps", "40", CVAR_SYSTEMINFO | CVAR_TEMP);
 #else
 	sv_fps = Cvar_Get ("sv_fps", "20", CVAR_SYSTEMINFO | CVAR_TEMP);
 #endif
