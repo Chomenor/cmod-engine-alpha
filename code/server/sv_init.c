@@ -767,7 +767,14 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	}
 
 	if ( sv_altSwapSupport->integer ) {
-		SV_SetConfigstring( 880, "!modcfg \\altSwapSupport\\1" );
+		// try to place alt swap support value in unused configstring index
+		// specific index value doesn't matter since client checks all of them
+		for ( i = 1020; i > 1000; --i ) {
+			if ( !*sv.configstrings[i] ) {
+				SV_SetConfigstring( i, "!modcfg \\altSwapSupport\\1" );
+				break;
+			}
+		}
 	}
 #endif
 
