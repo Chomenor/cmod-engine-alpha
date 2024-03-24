@@ -311,13 +311,11 @@ static int SV_Lua_ExecClientCmd( lua_State *L ) {
 		int clientNum = lua_tointegerx( L, 1, &clientValid );
 		if ( !clientValid || !CLIENT_CONNECTED( clientNum ) ) {
 			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.exec_client_cmd: invalid client\n" );
-		} else if ( sv_lua_running_client_command ) {
-			// shouldn't happen
-			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.exec_client_cmd: already running\n" );
 		} else {
+			qboolean oldCmdState = sv_lua_running_client_command;
 			sv_lua_running_client_command = qtrue;
 			SV_ExecuteClientCommand( &svs.clients[clientNum], cmd );
-			sv_lua_running_client_command = qfalse;
+			sv_lua_running_client_command = oldCmdState;
 		}
 	}
 	return 0;
