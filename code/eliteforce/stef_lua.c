@@ -294,7 +294,7 @@ static int Stef_Lua_ListFiles( lua_State *L ) {
 	} else {
 		int i;
 		int numFiles = 0;
-		const char **files = FS_ListFiles( path, lua_tostring( L, 2 ), &numFiles );
+		char **files = FS_ListFiles( path, lua_tostring( L, 2 ), &numFiles );
 		lua_createtable( L, numFiles, 0 );
 		for ( i = 0; i < numFiles; ++i ) {
 			lua_pushstring( L, files[i] );
