@@ -713,7 +713,9 @@ static void SVC_Status( const netadr_t *from ) {
 	}
 
 	// Make sure challenge is at beginning of info string for compatibility with Raven master
-	Q_strncpyz( infostring, va( "\\challenge\\%s%s", Cmd_Argv( 1 ), infostring ), MAX_INFO_STRING );
+	if ( *Cmd_Argv( 1 ) ) {
+		Q_strncpyz( infostring, va( "\\challenge\\%s%s", Cmd_Argv( 1 ), infostring ), MAX_INFO_STRING );
+	}
 #else
 	// echo back the parameter to status. so master servers can use it as a challenge
 	// to prevent timed spoofed reply packets that add ghost servers
