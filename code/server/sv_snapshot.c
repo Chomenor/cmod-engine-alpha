@@ -746,7 +746,7 @@ void SV_SendClientSnapshot( client_t *client ) {
 #ifdef ELITEFORCE
 	if(client->compat)
 	{
-		MSG_InitOOB(&msg, msg_buf, sizeof(msg_buf));
+		MSG_InitOOB(&msg, msg_buf, MAX_MSGLEN);
 		msg.compat = qtrue;
 	}
 	else

@@ -87,7 +87,7 @@ void SV_CalculateMaxBaselines( client_t *client, msg_t msg ) {
 	int start;
 	const svEntity_t *svEnt;
 	entityState_t nullstate;
-	byte msgBuffer[MAX_MSGLEN];
+	byte msgBuffer[MAX_MSGLEN_BUF];
 
 	client->maxEntityBaseline = -1;
 	Com_Memset( &nullstate, 0, sizeof( nullstate ) );

@@ -1045,7 +1045,7 @@ static void SV_SendClientGameState( client_t *client ) {
 
 #ifdef ELITEFORCE
 	if( client->compat )
-		MSG_InitOOB(&msg, msgBuffer, sizeof( msgBuffer ) );
+		MSG_InitOOB(&msg, msgBuffer, MAX_MSGLEN );
 	else
 #endif
 	MSG_Init( &msg, msgBuffer, MAX_MSGLEN );
@@ -1579,7 +1579,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 
 #ifdef ELITEFORCE
 	if ( cl->compat ) {
-		MSG_InitOOB( &msg, msgBuffer, sizeof( msgBuffer ) );
+		MSG_InitOOB( &msg, msgBuffer, sizeof( msgBuffer ) - 8 );
 		msg.compat = qtrue;
 
 		// Original EF client expects a snapshot ahead of download message,
