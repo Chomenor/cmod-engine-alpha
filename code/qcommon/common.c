@@ -382,7 +382,7 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 
 #ifdef STEF_LOGGING_DEFS
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
-		Logging_RegisterCrash( "crash: %s", fmt );
+		Logging_RegisterCrash( "crash: %s", com_errorMessage );
 	}
 #endif
 

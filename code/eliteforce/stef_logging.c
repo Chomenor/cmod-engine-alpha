@@ -89,7 +89,7 @@ Useful for temporary debugging purposes.
 void Logging_PrintStack( loggingPrintType_t printType, const char *conditions ) {
 	char buffer[MAXPRINTMSG];
 	Logging_GetStack( buffer, sizeof( buffer ) );
-	Logging_Printf( printType, conditions, "Debug Stack: %s", buffer );
+	Logging_Printf( printType, conditions, "Debug Stack: %s\n", buffer );
 }
 
 /*
@@ -106,7 +106,7 @@ void QDECL Logging_RegisterCrash( const char *fmt, ... ) {
 		va_start( argptr, fmt );
 		Q_vsnprintf( logging_frozen_reason, sizeof( logging_frozen_reason ), fmt, argptr );
 		va_end( argptr );
-		Logging_Printf( LP_CONSOLE, "WARNINGS!1 CRASH", "WARNING: freezing frame logging state - %s", logging_frozen_reason );
+		Logging_Printf( LP_CONSOLE, "WARNINGS!1 CRASH", "WARNING: freezing frame logging state - %s\n", logging_frozen_reason );
 		Logging_PrintStack( LP_CONSOLE, "WARNINGS!1 CRASH" );
 	}
 }
