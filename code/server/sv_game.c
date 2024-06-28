@@ -508,6 +508,9 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 	case G_SET_USERINFO:
 		SV_SetUserinfo( args[1], VMA(2) );
+#ifdef STEF_LUA_SERVER
+		SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_USERINFO_CHANGED, args[1] );
+#endif
 		return 0;
 	case G_GET_USERINFO:
 		VM_CHECKBOUNDS( gvm, args[2], args[3] );

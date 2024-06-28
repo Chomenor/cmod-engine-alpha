@@ -2035,9 +2035,6 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 			SV_DropClient( cl, val );
 		}
 	}
-#ifdef STEF_LUA_SERVER
-	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_USERINFO_CHANGED, cl - svs.clients );
-#endif
 }
 
 
@@ -2061,6 +2058,9 @@ static void SV_UpdateUserinfo_f( client_t *cl ) {
 	SV_UserinfoChanged( cl, qtrue, qtrue ); // update userinfo, run filter
 	// call prog code to allow overrides
 	VM_Call( gvm, 1, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients );
+#ifdef STEF_LUA_SERVER
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_POST_USERINFO_CHANGED, cl - svs.clients );
+#endif
 }
 
 extern int SV_Strlen( const char *str );
