@@ -496,6 +496,7 @@ static void Record_StartWriter( int maxClients, qboolean autoStarted ) {
 	Record_Stream_DumpToFile( &rws->stream, rws->recordfile );
 
 	Record_Printf( RP_ALL, "Recording to %s/%s.rec\n", rws->targetDirectory, rws->targetFilename );
+	Logging_Printf( LP_INFO, "SV_NOTIFY_RECORD", "Recording to %s/%s.rec", rws->targetDirectory, rws->targetFilename );
 }
 
 /*
@@ -509,6 +510,7 @@ void Record_StopWriter( void ) {
 	}
 	Record_CloseRecordWriter();
 	Record_Printf( RP_ALL, "Recording stopped.\n" );
+	Logging_Printf( LP_INFO, "SV_NOTIFY_RECORD", "Recording stopped." );
 }
 
 /*
