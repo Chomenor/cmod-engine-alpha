@@ -1000,15 +1000,14 @@ void Record_WriteGamestateMessage( record_entityset_t *baselines, char **configs
 	}
 
 #ifdef ELITEFORCE
-	if ( msg->compat )
+	if ( msg->compat ) {
 		MSG_WriteByte( msg, 0 );
-	else
+		return;
+	}
 #endif
+
 	MSG_WriteByte( msg, svc_EOF );
 
-#ifdef ELITEFORCE
-	if ( !msg->compat )
-#endif
 	// write the client num
 	MSG_WriteLong( msg, clientNum );
 
