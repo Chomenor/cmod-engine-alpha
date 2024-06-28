@@ -129,11 +129,7 @@ void SV_SetConfigstring (int index, const char *val) {
 		Stef_Lua_PushInteger( "index", index );
 		Stef_Lua_PushString( "value", val );
 		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
-			// save value in engine for game module traps to access
-			if ( strcmp( val, sv.configstrings[index] ) ) {
-				Z_Free( sv.configstrings[index] );
-				sv.configstrings[index] = CopyString( val );
-			}
+			return;
 		}
 	}
 #endif

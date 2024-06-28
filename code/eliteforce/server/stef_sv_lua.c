@@ -295,6 +295,30 @@ static int SV_Lua_SendGamestate( lua_State *L ) {
 
 /*
 =================
+SV_Lua_UpdateEngineConfigstring
+
+Allows Lua-based configstring management to update the engine configstring values
+so they can be accessed by game module traps and the record/admin spectator system.
+=================
+*/
+static int SV_Lua_UpdateEngineConfigstring( lua_State *L ) {
+	int indexValid = 0;
+	int index = lua_tointegerx( L, 1, &indexValid );
+	const char *val = lua_tostring( L, 2 );
+	if ( !indexValid || index < 0 || index >= MAX_CONFIGSTRINGS || !val ) {
+		Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.update_engine_configstring: invalid parameters\n" );
+	} else if ( strcmp( val, sv.configstrings[index] ) ) {
+		Z_Free( sv.configstrings[index] );
+		sv.configstrings[index] = CopyString( val );
+#ifdef STEF_SERVER_RECORD
+		Record_ProcessConfigstring( index, val );
+#endif
+	}
+	return 0;
+}
+
+/*
+=================
 SV_Lua_ExecClientCmd
 
 Run a command as if it was issued by a client. Bypasses flood protection.
@@ -343,6 +367,7 @@ static void SV_Lua_SetupInterface( lua_State *L ) {
 	ADD_FUNCTION( "is_client_cs_ready", SV_Lua_IsClientCSReady );
 	ADD_FUNCTION( "send_servercmd", SV_Lua_SendServerCmd );
 	ADD_FUNCTION( "send_gamestate", SV_Lua_SendGamestate );
+	ADD_FUNCTION( "update_engine_configstring", SV_Lua_UpdateEngineConfigstring );
 	ADD_FUNCTION( "exec_client_cmd", SV_Lua_ExecClientCmd );
 
 	#define ADD_STRING_CONSTANT( name, value ) \
