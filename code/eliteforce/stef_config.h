@@ -142,22 +142,9 @@
 // coordinated with game module fixes in order to work consistently.
 #define STEF_SHIELD_EFFECT_FIX
 
-// [BUGFIX] Disable force-spawning loading players into game during map restart.
-// Fixes freezing after UDP download due to CS_ACTIVE check in SV_DoneDownload_f.
-#define STEF_MAP_RESTART_NO_LOADING_SPAWN
-
-// [BUGFIX] Set players to CS_CONNECTED during UDP downloads, preventing server commands
-// being added in SV_AddServerCommand which can accumulate without being sent properly.
-#define STEF_DOWNLOAD_CONNECTION_STATE_FIX
-
 // [BUGFIX] Fix for "Delta parseEntitiesNum too old" errors in certain cases.
 // (40+ sv_fps value + 1.20 client + high ping/bad connection)
 #define STEF_SNAPSHOT_DELTA_BUFFER_FIX
-
-// [BUGFIX] Use alternative to changing serverid during map restarts.
-// This avoids the need for a systeminfo update during map restarts and potentially fixes
-// some intermittent buggy behavior seen in the EF 1.20 client.
-#define STEF_MAP_RESTART_STATIC_SERVERID
 
 // [BUGFIX] Prevent gamestate overflows by dropping entity baselines.
 // Fixes errors on certain maps under certain conditions.

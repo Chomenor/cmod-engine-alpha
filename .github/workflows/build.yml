@@ -43,7 +43,7 @@ jobs:
             rule: install
 
           - btype: Debug
-            rule: debug install
+            rule: debug
 
     defaults:
       run:
@@ -136,7 +136,7 @@ jobs:
 
           - btype: Debug
             if: ${{ github.event_name != 'release' }}
-            rule: debug install
+            rule: debug
 
           - arch: x86
             use_sdl: USE_SDL=0
@@ -175,12 +175,12 @@ jobs:
         retention-days: 5
 
   macos-x86:
-    name: ${{ matrix.btype }} macOS x86_64
+    name: ${{ matrix.btype }} macOS ${{ matrix.arch }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64]
+        arch: [x86_64, aarch64]
         cc: [clang]
         btype: [Release, Debug]
         include:
@@ -188,12 +188,12 @@ jobs:
             rule: install
 
           - btype: Debug
-            rule: debug install
+            rule: debug
 
     steps:
 
     - name: Install tools
-      run: brew install coreutils pkg-config sdl2
+      run: brew install coreutils sdl2 # pkg-config
 
     - uses: actions/checkout@v4
       with:
@@ -230,7 +230,7 @@ jobs:
           7z a -r cmod-macos-x86_64.zip         ./macos-x86_64/*
 
       - name: Create latest build
-        uses: marvinpinto/action-automatic-releases@latest
+        uses: czietz/action-automatic-releases@latest
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           automatic_release_tag: "latest"

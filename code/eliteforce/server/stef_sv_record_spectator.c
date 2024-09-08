@@ -616,8 +616,8 @@ static void Record_Spectator_ProcessMessage( spectator_t *spectator, msg_t *msg 
 		cl->reliableAcknowledge = cl->reliableSequence;
 	}
 
-	if ( serverId < sv.restartedServerId || serverId > sv.serverId ) {
-		// Pre map change serverID, or invalid high serverID
+	if ( serverId != sv.serverId ) {
+		// Invalid serverID
 		if ( cl->messageAcknowledge > cl->gamestateMessageNum ) {
 			// No previous gamestate waiting to be acknowledged - send new one
 			Record_SendSpectatorGamestate( spectator );
