@@ -506,6 +506,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableIntegerValue( "sv_running" ) ) {
+#ifdef STEF_MAXCLIENTS_FIRST_RESTART_FIX
+		// unlatch and clear modified flag
+		sv_maxclients = Cvar_Get( "sv_maxclients", "8", 0 );
+		sv_maxclients->modified = qfalse;
+#endif
 		SV_Startup();
 	} else {
 		// check for maxclients change

@@ -164,6 +164,10 @@
 // the server.
 #define STEF_WINDOWS_CONSOLE_CRASH_FIX
 
+// [BUGFIX] Workaround for Q3e issue causing issues with the first map restart
+// or warmup end after server is launched.
+#define STEF_MAXCLIENTS_FIRST_RESTART_FIX
+
 /* ******************************************************************************** */
 // Common Dependencies
 /* ******************************************************************************** */
