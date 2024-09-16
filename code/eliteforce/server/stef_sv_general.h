@@ -42,10 +42,13 @@ qboolean Record_ProcessPacketEvent( const netadr_t *address, msg_t *msg, int qpo
 #define SV_LUA_EVENT_POST_MAP_START "sv_post_map_start"
 #define SV_LUA_EVENT_PRE_MAP_RESTART "sv_pre_map_restart"
 #define SV_LUA_EVENT_POST_MAP_RESTART "sv_post_map_restart"
+#define SV_LUA_EVENT_PRE_GAME_INIT "sv_pre_game_init"
 #define SV_LUA_EVENT_LOAD_ENTITIES "sv_load_entities"
 #define SV_LUA_EVENT_PRE_CLIENT_CONNECT "sv_pre_client_connect"
+#define SV_LUA_EVENT_INIT_CLIENT_SLOT "sv_init_client_slot"
 #define SV_LUA_EVENT_POST_CLIENT_CONNECT "sv_post_client_connect"
 #define SV_LUA_EVENT_POST_CLIENT_DISCONNECT "sv_post_client_disconnect"
+#define SV_LUA_EVENT_CLIENT_USERINFO "sv_client_userinfo"
 #define SV_LUA_EVENT_POST_USERINFO_CHANGED "sv_post_userinfo_changed"
 #define SV_LUA_EVENT_SET_CONFIGSTRING "sv_setcs"
 #define SV_LUA_EVENT_UPDATE_CONFIGSTRING "sv_updatecs"
@@ -64,6 +67,7 @@ void SV_Lua_OpenDownload( int clientNum );
 char *SV_Lua_GetEntityString( qboolean forBots );
 qboolean SV_Lua_GetResourcePath( const char *type, char *buffer, unsigned int bufSize );
 qboolean SV_Lua_PacketCommand( const netadr_t *from );
+void SV_Lua_HandleClientUserinfo( int clientNum, char *buffer, int bufSize );
 #endif
 
 #ifdef STEF_GAMESTATE_OVERFLOW_FIX

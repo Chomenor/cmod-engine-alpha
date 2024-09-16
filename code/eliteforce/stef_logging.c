@@ -270,7 +270,7 @@ LP_DEVELOPER and LP_CONSOLE it must be included in the parameter.
 */
 void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg ) {
 #if defined( STEF_LUA_EVENTS ) && defined( STEF_LOGGING_SYSTEM )
-	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_CONSOLE_PRINT ) ) {
 		Stef_Lua_PushString( "text", msg );
 		Stef_Lua_PushInteger( "printlevel", printlevel >= LP_CONSOLE ? 2 : printlevel >= LP_DEVELOPER ? 1 : 0 );
 		if ( conditions && *conditions ) {

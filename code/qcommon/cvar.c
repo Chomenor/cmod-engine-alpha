@@ -2112,3 +2112,19 @@ void Cvar_Init (void)
 	Cmd_AddCommand ("cvar_restart", Cvar_Restart_f);
 	Cmd_AddCommand ("cvar_trim", Cvar_Trim_f);
 }
+
+#ifdef STEF_LUA_SUPPORT
+/*
+=================
+Stef_Lua_CvarEmitList
+=================
+*/
+void Stef_Lua_CvarEmitList( void ) {
+	cvar_t *var;
+	for ( var = cvar_vars; var; var = var->next ) {
+		if ( var->name ) {
+			Stef_Lua_PushString( NULL, var->name );
+		}
+	}
+}
+#endif

@@ -191,7 +191,7 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 	va_end( argptr );
 
 #ifdef STEF_LUA_EVENTS
-	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_CONSOLE_PRINT ) ) {
 		// generate lua event with printlevel 2 (general print)
 		Stef_Lua_PushString( "text", msg );
 		Stef_Lua_PushInteger( "printlevel", 2 );
@@ -287,7 +287,7 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 	char		msg[MAXPRINTMSG];
 
 #ifdef STEF_LUA_EVENTS
-	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_LOG_PRINT ) ) {
+	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_CONSOLE_PRINT ) ) {
 		va_start( argptr, fmt );
 		Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 		va_end( argptr );

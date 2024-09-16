@@ -799,7 +799,17 @@ gotnewcl:
 	newcl->country = SV_FindCountry( newcl->tld );
 
 #ifdef STEF_LUA_SERVER
-	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_PRE_CLIENT_CONNECT, clientNum );
+	// give lua script a chance to reject connection
+	if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_PRE_CLIENT_CONNECT ) ) {
+		Stef_Lua_PushBytes( "netadr", from, sizeof( *from ) );
+		Stef_Lua_PushString( "userinfo", info );
+		if ( Stef_Lua_RunEventCall() && Stef_Lua_FinishEventCall() ) {
+			return;
+		}
+	}
+
+	// lua initialization ahead of userinfo changed or GAME_CLIENT_CONNECT
+	SV_Lua_SimpleClientEventCall( SV_LUA_EVENT_INIT_CLIENT_SLOT, clientNum );
 #endif
 
 	SV_UserinfoChanged( newcl, qtrue, qfalse ); // update userinfo, do not run filter
@@ -2077,6 +2087,10 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 					Info_ValueForKey( cl->userinfo, "ip" ) );
 		}
 	}
+#endif
+
+#ifdef STEF_LUA_SERVER
+	SV_Lua_HandleClientUserinfo( cl - svs.clients, cl->userinfo, sizeof( cl->userinfo ) );
 #endif
 
 	// name for C code

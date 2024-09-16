@@ -380,10 +380,13 @@ static void SV_Lua_SetupInterface( lua_State *L ) {
 	ADD_STRING_CONSTANT( "post_map_start", SV_LUA_EVENT_POST_MAP_START );
 	ADD_STRING_CONSTANT( "pre_map_restart", SV_LUA_EVENT_PRE_MAP_RESTART );
 	ADD_STRING_CONSTANT( "post_map_restart", SV_LUA_EVENT_POST_MAP_RESTART );
+	ADD_STRING_CONSTANT( "pre_game_init", SV_LUA_EVENT_PRE_GAME_INIT );
 	ADD_STRING_CONSTANT( "load_entities", SV_LUA_EVENT_LOAD_ENTITIES );
 	ADD_STRING_CONSTANT( "pre_client_connect", SV_LUA_EVENT_PRE_CLIENT_CONNECT );
+	ADD_STRING_CONSTANT( "init_client_slot", SV_LUA_EVENT_INIT_CLIENT_SLOT );
 	ADD_STRING_CONSTANT( "post_client_connect", SV_LUA_EVENT_POST_CLIENT_CONNECT );
 	ADD_STRING_CONSTANT( "post_client_disconnect", SV_LUA_EVENT_POST_CLIENT_DISCONNECT );
+	ADD_STRING_CONSTANT( "client_userinfo", SV_LUA_EVENT_CLIENT_USERINFO );
 	ADD_STRING_CONSTANT( "post_userinfo_changed", SV_LUA_EVENT_POST_USERINFO_CHANGED );
 	ADD_STRING_CONSTANT( "set_configstring", SV_LUA_EVENT_SET_CONFIGSTRING );
 	ADD_STRING_CONSTANT( "update_configstring", SV_LUA_EVENT_UPDATE_CONFIGSTRING );
@@ -539,7 +542,7 @@ Event fields:
 - text: entity string from bsp being loaded
 
 Result fields:
-- override: use modified text value
+- override: boolean indicating to use modified text value
 =================
 */
 char *SV_Lua_GetEntityString( qboolean forBots ) {
@@ -632,6 +635,33 @@ qboolean SV_Lua_PacketCommand( const netadr_t *from ) {
 	}
 
 	return qfalse;
+}
+
+/*
+=================
+SV_Lua_HandleClientUserinfo
+
+Pass incoming client userinfo to Lua, allowing script to modify.
+Called for both connecting clients and userinfo changes via "userinfo" command.
+=================
+*/
+void SV_Lua_HandleClientUserinfo( int clientNum, char *buffer, int bufSize ) {
+	if ( Stef_Lua_InitEventCall( SV_LUA_EVENT_CLIENT_USERINFO ) ) {
+		Stef_Lua_PushString( "text", buffer );
+		if ( Stef_Lua_RunEventCall() ) {
+			if ( lua_getfield( stef_lua_state, -1, "override" ) == LUA_TBOOLEAN && lua_toboolean( stef_lua_state, -1 ) ) {
+				const char *newString;
+				lua_getfield( stef_lua_state, -2, "text" );
+				newString = lua_tostring( stef_lua_state, -1 );
+				if ( newString ) {
+					Q_strncpyz( buffer, newString, bufSize );
+				}
+				lua_pop( stef_lua_state, 1 ); // text
+			}
+			lua_pop( stef_lua_state, 1 ); // override boolean
+			Stef_Lua_FinishEventCall();
+		}
+	}
 }
 
 /*

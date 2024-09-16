@@ -54,13 +54,14 @@ int SV_StatusScoresOverride_AdjustScore( int defaultScore, int clientNum );
 #ifdef STEF_LUA_SUPPORT
 #define STEF_LUA_EVENT_POST_FRAME "com_post_frame"
 #define STEF_LUA_EVENT_CONSOLE_COMMAND "com_console_cmd"
-#define STEF_LUA_EVENT_LOG_PRINT "com_logprint"
+#define STEF_LUA_EVENT_CONSOLE_PRINT "com_console_print"
 #define STEF_LUA_EVENT_LOG_FRAME "com_logframe"
 
 extern qboolean stef_lua_suppress_print_event;
 extern qboolean stef_lua_logframes_enabled;
 void Stef_Lua_Init( void );
 void Stef_Lua_PushString( const char *key, const char *value );
+void Stef_Lua_PushBytes( const char *key, const void *value, size_t size );
 void Stef_Lua_PushInteger( const char *key, int value );
 void Stef_Lua_PushBoolean( const char *key, qboolean value );
 qboolean Stef_Lua_InitEventCall( const char *name );

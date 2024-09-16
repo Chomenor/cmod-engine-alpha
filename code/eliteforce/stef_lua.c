@@ -42,6 +42,7 @@ qboolean stef_lua_logframes_enabled;
 #ifdef STEF_LOGGING_SYSTEM
 void Logging_GetLuaFrameInfo( int frameNum );
 #endif
+void Stef_Lua_CvarEmitList( void );
 
 static char *stef_lua_parseBuffer;
 static const char *stef_lua_parsePtr;
@@ -135,9 +136,7 @@ Stef_Lua_PrintCmd
 static int Stef_Lua_PrintCmd( lua_State *L ) {
 	const char *text = lua_tostring( L, 1 );
 	if ( text && *text ) {
-		stef_lua_suppress_print_event = qtrue;
 		Com_Printf( "%s", text );
-		stef_lua_suppress_print_event = qfalse;
 	}
 	return 0;
 }
@@ -326,11 +325,19 @@ Stef_Lua_RunCmd
 */
 static int Stef_Lua_RunCmd( lua_State *L ) {
 	const char *text = lua_tostring( L, 1 );
-	const char *typeArg = lua_tostring( L, 2 );
+	const char *modeArg = lua_tostring( L, 2 );
 	cbufExec_t execType = EXEC_INSERT;
 
-	if ( typeArg && !Q_stricmp( typeArg, "append" ) ) {
-		execType = EXEC_APPEND;
+	if ( modeArg ) {
+		if ( !Q_stricmp( modeArg, "insert" ) ) {
+			execType = EXEC_INSERT;
+		} else if ( !Q_stricmp( modeArg, "append" ) ) {
+			execType = EXEC_APPEND;
+		} else if ( !Q_stricmp( modeArg, "now" ) ) {
+			execType = EXEC_NOW;
+		} else {
+			Logging_Printf( LP_CONSOLE, "WARNINGS", "lua com.cmd_exec: invalid mode\n" );
+		}
 	}
 
 	if ( text ) {
@@ -384,15 +391,38 @@ static int Stef_Lua_CvarRegister( lua_State *L ) {
 
 /*
 =================
-Stef_Lua_CvarSet
+Stef_Lua_CvarList
 =================
 */
-static int Stef_Lua_CvarSet( lua_State *L ) {
+static int Stef_Lua_CvarList( lua_State *L ) {
+	lua_newtable( L );
+	Stef_Lua_CvarEmitList();
+	return 1;
+}
+
+/*
+=================
+Stef_Lua_CvarForceSet
+=================
+*/
+static int Stef_Lua_CvarForceSet( lua_State *L ) {
 	const char *name = lua_tostring( L, 1 );
 	const char *value = lua_tostring( L, 2 );
 	if ( name && *name && value ) {
 		Cvar_Set( name, value );
 	}
+	return 0;
+}
+
+/*
+=================
+Stef_Lua_CvarForceRestart
+
+Only safe to call when no QVM is running.
+=================
+*/
+static int Stef_Lua_CvarForceRestart( lua_State *L ) {
+	Cvar_Restart( qtrue );
 	return 0;
 }
 
@@ -414,6 +444,16 @@ Stef_Lua_Argv
 static int Stef_Lua_Argv( lua_State *L ) {
 	int index = lua_tointeger( L, -1 );
 	lua_pushstring( L, Cmd_Argv( index ) );
+	return 1;
+}
+
+/*
+=================
+Stef_Lua_Cmdstr
+=================
+*/
+static int Stef_Lua_Cmdstr( lua_State *L ) {
+	lua_pushstring( L, Cmd_Cmd() );
 	return 1;
 }
 
@@ -488,6 +528,30 @@ static int Stef_Lua_SetLogFrameEventsEnabled( lua_State *L ) {
 
 /*
 =================
+Stef_Lua_SendPacket
+=================
+*/
+static int Stef_Lua_SendPacket( lua_State *L ) {
+	netadr_t adr;
+	size_t adrLen = 0;
+	const char *adrBytes = lua_tolstring( L, 1, &adrLen );
+	size_t msgLen = 0;
+	const char *msg = lua_tolstring( L, 2, &msgLen );
+
+	if ( adrLen != sizeof( adr ) ) {
+		Logging_Printf( LP_CONSOLE, "WARNINGS", "lua sv.send_packet: invalid address\n" );
+		return 0;
+	}
+
+	Com_Memcpy( &adr, adrBytes, sizeof( adr ) );
+
+	// Just use NS_SERVER for now; it shouldn't matter except for debug purposes
+	NET_SendPacket( NS_SERVER, (int)msgLen, msg, &adr );
+	return 0;
+}
+
+/*
+=================
 Stef_Lua_SetupInterace
 =================
 */
@@ -512,13 +576,17 @@ static void Stef_Lua_SetupInterface( lua_State *L ) {
 	ADD_FUNCTION( "cvar_get_string", Stef_Lua_CvarGetString );
 	ADD_FUNCTION( "cvar_get_integer", Stef_Lua_CvarGetInteger );
 	ADD_FUNCTION( "cvar_register", Stef_Lua_CvarRegister );
-	ADD_FUNCTION( "cvar_set", Stef_Lua_CvarSet );
+	ADD_FUNCTION( "cvar_list", Stef_Lua_CvarList );
+	ADD_FUNCTION( "cvar_force_set", Stef_Lua_CvarForceSet );
+	ADD_FUNCTION( "cvar_force_restart", Stef_Lua_CvarForceRestart );
 	ADD_FUNCTION( "argc", Stef_Lua_Argc );
 	ADD_FUNCTION( "argv", Stef_Lua_Argv );
+	ADD_FUNCTION( "cmdstr", Stef_Lua_Cmdstr );
 	ADD_FUNCTION( "parse_set_string", Stef_Lua_SetParseString );
 	ADD_FUNCTION( "parse_get_token", Stef_Lua_ParseToken );
 	ADD_FUNCTION( "log_frame_get", Stef_Lua_GetLogFrame );
 	ADD_FUNCTION( "log_frame_set_events_enabled", Stef_Lua_SetLogFrameEventsEnabled );
+	ADD_FUNCTION( "send_packet", Stef_Lua_SendPacket );
 
 	#define ADD_STRING_CONSTANT( name, value ) \
 		lua_pushstring( L, value ); \
@@ -526,7 +594,7 @@ static void Stef_Lua_SetupInterface( lua_State *L ) {
 	lua_newtable( L );
 	ADD_STRING_CONSTANT( "post_frame", STEF_LUA_EVENT_POST_FRAME );
 	ADD_STRING_CONSTANT( "console_cmd", STEF_LUA_EVENT_CONSOLE_COMMAND );
-	ADD_STRING_CONSTANT( "log_print", STEF_LUA_EVENT_LOG_PRINT );
+	ADD_STRING_CONSTANT( "console_print", STEF_LUA_EVENT_CONSOLE_PRINT );
 	ADD_STRING_CONSTANT( "log_frame", STEF_LUA_EVENT_LOG_FRAME );
 	lua_setfield( L, -2, "events" );
 
@@ -546,11 +614,30 @@ CALLS TO LUA
 Stef_Lua_PushString
 
 Add a string to a table on the top of current lua stack.
+NULL key indicates to push onto array.
 =================
 */
 void Stef_Lua_PushString( const char *key, const char *value ) {
-	if ( key && value && stef_lua_state && lua_istable( stef_lua_state, -1 ) ) {
+	if ( value && stef_lua_state && lua_istable( stef_lua_state, -1 ) ) {
 		lua_pushstring( stef_lua_state, value );
+		if ( key ) {
+			lua_setfield( stef_lua_state, -2, key );
+		} else {
+			lua_rawseti( stef_lua_state, -2, lua_rawlen( stef_lua_state, -2 ) + 1 );
+		}
+	}
+}
+
+/*
+=================
+Stef_Lua_PushBytes
+
+Adds binary string to a table on the top of current lua stack.
+=================
+*/
+void Stef_Lua_PushBytes( const char *key, const void *value, size_t size ) {
+	if ( key && value && stef_lua_state && lua_istable( stef_lua_state, -1 ) ) {
+		lua_pushlstring( stef_lua_state, (const char *)value, size );
 		lua_setfield( stef_lua_state, -2, key );
 	}
 }

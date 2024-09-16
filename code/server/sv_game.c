@@ -1130,6 +1130,10 @@ static void SV_InitGameVM( qboolean restart ) {
 	SV_StatusScoresOverride_Reset();
 #endif
 
+#ifdef STEF_LUA_SUPPORT
+	Stef_Lua_SimpleEventCall( SV_LUA_EVENT_PRE_GAME_INIT );
+#endif
+
 	// use the current msec count for a random seed
 	// init for this gamestate
 	VM_Call( gvm, 3, GAME_INIT, sv.time, Com_Milliseconds(), restart );
