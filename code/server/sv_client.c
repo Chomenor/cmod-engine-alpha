@@ -126,6 +126,7 @@ void SV_GetChallenge( const netadr_t *from ) {
 	}
 #endif
 
+#ifndef STEF_LUA_SERVER
 	// Prevent using getchallenge as an amplifier
 	if ( SVC_RateLimitAddress( from, 10, 1000 ) ) {
 		if ( com_developer->integer ) {
@@ -134,6 +135,7 @@ void SV_GetChallenge( const netadr_t *from ) {
 		}
 		return;
 	}
+#endif
 
 	// Create a unique challenge for this client without storing state on the server
 	challenge = SV_CreateChallenge( svs.time >> TS_SHIFT, from );
@@ -493,6 +495,7 @@ void SV_DirectConnect( const netadr_t *from ) {
 	}
 #endif
 
+#ifndef STEF_LUA_SERVER
 	// Prevent using connect as an amplifier
 	if ( SVC_RateLimitAddress( from, 10, 1000 ) ) {
 		if ( com_developer->integer ) {
@@ -501,6 +504,7 @@ void SV_DirectConnect( const netadr_t *from ) {
 		}
 		return;
 	}
+#endif
 
 	// check for concurrent connections
 	for ( i = 0, n = 0; i < sv.maxclients; i++ ) {
