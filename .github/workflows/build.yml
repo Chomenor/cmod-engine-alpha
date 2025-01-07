@@ -66,7 +66,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=1 USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
+        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=1 USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'release'
@@ -164,7 +164,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip in Release builds
       run: |
-        make ${{ matrix.rule }} -j 8 ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
+        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'gcc' && matrix.btype == 'release'
@@ -202,7 +202,7 @@ jobs:
     - name: Build
       if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }} # skip Debug configuration in Release build
       run: |
-        make ${{ matrix.rule }} -j 4 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl STRIP=echo
+        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=1 RENDERER_DEFAULT=opengl STRIP=echo
 
     - uses: actions/upload-artifact@v4
       if: matrix.cc == 'clang' && matrix.btype == 'release'
@@ -228,6 +228,7 @@ jobs:
           7z a -r cmod-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
           7z a -r cmod-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
           7z a -r cmod-macos-x86_64.zip         ./macos-x86_64/*
+          7z a -r cmod-macos-aarch64.zip        ./macos-aarch64/*
 
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest

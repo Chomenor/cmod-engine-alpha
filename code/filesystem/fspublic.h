@@ -61,6 +61,7 @@ typedef enum {
 #define FS_MATCH_EXTERN LISTFLAG_DIRECT_SOURCE_ONLY
 #define FS_MATCH_PK3s LISTFLAG_PK3_SOURCE_ONLY
 #define FS_MATCH_STICK LISTFLAG_IGNORE_PURE_LIST
+#define FS_MATCH_SUBDIRS 0	// Fixme
 #define FS_MATCH_ANY 0
 
 typedef qboolean ( *fnamecallback_f )( const char *filename, int length );
