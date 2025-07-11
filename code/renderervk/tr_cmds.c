@@ -35,10 +35,9 @@ static void R_PerformanceCounters( void ) {
 	}
 
 	if (r_speeds->integer == 1) {
-		ri.Printf (PRINT_ALL, "%i/%i shaders/surfs %i leafs %i verts %i/%i tris %.2f mtex %.2f dc\n",
+		ri.Printf (PRINT_ALL, "%i/%i shaders/surfs %i leafs %i verts %i/%i tris %.2f mtex\n",
 			backEnd.pc.c_shaders, backEnd.pc.c_surfaces, tr.pc.c_leafs, backEnd.pc.c_vertexes, 
-			backEnd.pc.c_indexes/3, backEnd.pc.c_totalIndexes/3, 
-			R_SumOfUsedImages()/(1000000.0f), backEnd.pc.c_overDraw / (float)(glConfig.vidWidth * glConfig.vidHeight) ); 
+			backEnd.pc.c_indexes/3, backEnd.pc.c_totalIndexes/3, R_SumOfUsedImages()/1000000.0); 
 	} else if (r_speeds->integer == 2) {
 		ri.Printf (PRINT_ALL, "(patch) %i sin %i sclip  %i sout %i bin %i bclip %i bout\n",
 			tr.pc.c_sphere_cull_patch_in, tr.pc.c_sphere_cull_patch_clip, tr.pc.c_sphere_cull_patch_out, 
@@ -297,9 +296,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
-#ifndef USE_VULKAN
 	glState.finishCalled = qfalse;
-#endif
 
 #ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;
@@ -342,8 +339,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 #endif
 	}
 
+#ifndef USE_BUFFER_CLEAR
 #ifdef USE_VULKAN
-	if ( r_fastsky->integer && vk.fastSky ) {
+	if ( r_fastsky->integer && vk.clearAttachment ) {
 #else
 	if ( r_fastsky->integer ) {
 #endif
@@ -354,6 +352,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			clrcmd->commandId = RC_CLEARCOLOR;
 		}
 	}
+#endif // USE_BUFFER_CLEAR
 
 	tr.refdef.stereoFrame = stereoFrame;
 }
@@ -380,9 +379,9 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 	cmd->commandId = RC_SWAP_BUFFERS;
 
-	R_PerformanceCounters();
-
 	R_IssueRenderCommands();
+
+	R_PerformanceCounters();
 
 	R_InitNextFrame();
 

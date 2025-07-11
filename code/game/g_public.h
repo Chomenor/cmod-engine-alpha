@@ -394,6 +394,8 @@ typedef enum {
 	G_TESTPRINTINT,
 	G_TESTPRINTFLOAT,
 
+	// engine extensions
+	G_CVAR_SETDESCRIPTION,
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 } gameImport_t;
 #else
@@ -691,6 +693,7 @@ typedef enum {
 	BOTLIB_PC_SOURCE_FILE_AND_LINE,
 
 	// engine extensions
+	G_CVAR_SETDESCRIPTION,
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 
 } gameImport_t;

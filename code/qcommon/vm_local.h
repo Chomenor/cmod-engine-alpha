@@ -206,6 +206,7 @@ struct vm_s {
 	uint32_t	dataLength;			// data segment length
 	uint32_t	exactDataLength;	// from qvm header
 	uint32_t	dataAlloc;			// actually allocated, for mmap()/munmap()
+	uint32_t	programStackExtra;
 
 	int			numSymbols;
 	vmSymbol_t	*symbols;

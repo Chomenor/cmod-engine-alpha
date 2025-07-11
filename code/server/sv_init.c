@@ -336,6 +336,8 @@ static void SV_Startup( void ) {
 
 	SV_AllocClients( sv_maxclients->integer );
 
+	sv_maxclients->modified = qfalse;
+
 	svs.initialized = qtrue;
 
 	// Don't respect sv_killserver unless a server is actually running
@@ -506,11 +508,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableIntegerValue( "sv_running" ) ) {
-#ifdef STEF_MAXCLIENTS_FIRST_RESTART_FIX
-		// unlatch and clear modified flag
-		sv_maxclients = Cvar_Get( "sv_maxclients", "8", 0 );
-		sv_maxclients->modified = qfalse;
-#endif
 		SV_Startup();
 	} else {
 		// check for maxclients change
@@ -850,7 +847,7 @@ void SV_Init( void )
 	sv_maxclients = Cvar_Get ("sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH);
 #endif
 	Cvar_CheckRange( sv_maxclients, "1", XSTRING(MAX_CLIENTS), CV_INTEGER );
-	Cvar_SetDescription( sv_maxclients, "Maximum number of people allowed to join the server dedicated server memory optimizations." );
+	Cvar_SetDescription( sv_maxclients, "Maximum number of people allowed to join the server." );
 
 #ifdef STEF_DEFAULT_SETTINGS_TWEAKS
 	sv_maxclientsPerIP = Cvar_Get( "sv_maxclientsPerIP", "5", CVAR_ARCHIVE );
