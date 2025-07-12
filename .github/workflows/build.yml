@@ -121,13 +121,13 @@ jobs:
         if-no-files-found: error
         retention-days: 5
         
-  ubuntu-x86:
+  ubuntu:
     name: ${{ matrix.btype }} Ubuntu ${{ matrix.arch }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-22.04-arm' || 'ubuntu-22.04' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86, x86_64]
+        arch: [x86, x86_64, arm64]
         cc: [gcc]
         btype: [Release, Debug]
         include:
@@ -214,7 +214,7 @@ jobs:
 
   create-testing:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [windows-msys, windows-msvc, ubuntu-x86, macos-x86]
+    needs: [windows-msys, windows-msvc, ubuntu, macos-x86]
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
@@ -224,6 +224,7 @@ jobs:
         run: |
           7z a -r cmod-linux-x86.zip            ./linux-x86/*
           7z a -r cmod-linux-x86_64.zip         ./linux-x86_64/*
+          7z a -r cmod-linux-arm64.zip          ./linux-arm64/*
           7z a -r cmod-windows-mingw-x86.zip    ./windows-mingw-x86/*
           7z a -r cmod-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
           7z a -r cmod-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
