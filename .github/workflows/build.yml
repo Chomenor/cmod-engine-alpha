@@ -123,11 +123,11 @@ jobs:
         
   ubuntu:
     name: ${{ matrix.btype }} Ubuntu ${{ matrix.arch }}
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-22.04-arm' || 'ubuntu-22.04' }}
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-22.04-arm' || 'ubuntu-22.04' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86, x86_64, arm64]
+        arch: [x86, x86_64, aarch64]
         cc: [gcc]
         btype: [Release, Debug]
         include:
@@ -224,7 +224,7 @@ jobs:
         run: |
           7z a -r cmod-linux-x86.zip            ./linux-x86/*
           7z a -r cmod-linux-x86_64.zip         ./linux-x86_64/*
-          7z a -r cmod-linux-arm64.zip          ./linux-arm64/*
+          7z a -r cmod-linux-aarch64.zip        ./linux-aarch64/*
           7z a -r cmod-windows-mingw-x86.zip    ./windows-mingw-x86/*
           7z a -r cmod-windows-mingw-x86_64.zip ./windows-mingw-x86_64/*
           7z a -r cmod-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
