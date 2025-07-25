@@ -1079,6 +1079,13 @@ static void SV_SendClientGameState( client_t *client ) {
 
 	Com_DPrintf( "SV_SendClientGameState() for %s\n", client->name );
 
+#ifdef STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+	if ( client->state < CS_PRIMED ) {
+		// clear old cs change log to avoid unnecessary retransmits
+		Com_Memset( client->csUpdated, 0, sizeof( client->csUpdated ) );
+	}
+#endif
+
 	SV_PrintClientStateChange( client, CS_PRIMED );
 
 	client->state = CS_PRIMED;
@@ -1340,6 +1347,20 @@ static void SV_DoneDownload_f( client_t *cl ) {
 
 	Com_DPrintf( "clientDownload: %s Done\n", cl->name );
 
+#ifdef STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+	if ( cl->compat && cl->state == CS_PRIMED ) {
+		// Vanilla client will load map based on the pre-download gamestate, so a new one is
+		// unnecessary and would cause double loading. Note that it's also possible for ioEF
+		// clients to use protocol 24 and get cl->compat, but in this case the drop check
+		// should should handle sending the gamestate after a short delay.
+		cl->downloading = qfalse;
+
+		// Don't immediately trip dropped download gamestate checks in SV_ExecuteClientMessage
+		cl->gamestateMessageNum = cl->messageAcknowledge - 1;
+		return;
+	}
+#endif
+
 	// resend the game state to update any clients that entered during the download
 	SV_SendClientGameState( cl );
 }
@@ -1394,8 +1415,20 @@ static void SV_BeginDownload_f( client_t *cl ) {
 	// the file itself
 	Q_strncpyz( cl->downloadName, Cmd_Argv(1), sizeof(cl->downloadName) );
 
+#ifdef STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+	if ( cl->compat ) {
+		// Vanilla clients will try to load map based on the pre-download gamestate,
+		// so we need to track configstring updates during the download
+		SV_PrintClientStateChange( cl, CS_PRIMED );
+		cl->state = CS_PRIMED;
+	} else {
+		SV_PrintClientStateChange( cl, CS_CONNECTED );
+		cl->state = CS_CONNECTED;
+	}
+#else
 	SV_PrintClientStateChange( cl, CS_CONNECTED );
 	cl->state = CS_CONNECTED;
+#endif
 	cl->gentity = NULL;
 
 	cl->downloading = qtrue;

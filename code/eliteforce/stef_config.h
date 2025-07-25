@@ -125,6 +125,11 @@
 // Significantly simplifies code and fixes some potential issues involving UDP downloads.
 #define STEF_REWORK_GAMESTATE_RETRANSMIT
 
+// [TWEAK] Avoid 1.20 clients loading the map twice when downloads complete.
+#if defined( STEF_REWORK_GAMESTATE_RETRANSMIT )
+#define STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+#endif
+
 // [BUGFIX] Workaround to allow certain older ioEF versions (e.g. 1.37) to successfully
 // negotiate protocol version and connect to the server.
 #define STEF_PROTOCOL_MSG_FIX
