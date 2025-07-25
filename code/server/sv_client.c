@@ -1073,7 +1073,9 @@ static void SV_SendClientGameState( client_t *client ) {
 	const svEntity_t *svEnt;
 	msg_t		msg;
 	byte		msgBuffer[ MAX_MSGLEN_BUF ];
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 	qboolean	csUpdated;
+#endif
 
 	Com_DPrintf( "SV_SendClientGameState() for %s\n", client->name );
 
@@ -1129,7 +1131,9 @@ static void SV_SendClientGameState( client_t *client ) {
 	MSG_WriteLong( &msg, client->reliableSequence );
 
 	// write the configstrings
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 	csUpdated = qfalse;
+#endif
 #ifdef STEF_LUA_SUPPORT
 	if ( !SV_Lua_GamestateConfigstrings( client - svs.clients, &msg ) )
 #endif
@@ -1147,12 +1151,15 @@ static void SV_SendClientGameState( client_t *client ) {
 				MSG_WriteBigString( &msg, sv.configstrings[start] );
 			}
 		}
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 		if ( client->csUpdated[start] ) {
 			csUpdated = qtrue;
 		}
 		client->csUpdated[start] = qfalse;
+#endif
 	}
 
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 	if ( client->gamestateAck == GSA_INIT ) {
 		// inital submission, accept any messageAcknowledge with matching serverId
 		client->gamestateAck = GSA_SENT_ONCE;
@@ -1164,6 +1171,7 @@ static void SV_SendClientGameState( client_t *client ) {
 			client->gamestateAck = GSA_SENT_MANY;
 		}
 	}
+#endif
 
 #ifdef STEF_GAMESTATE_OVERFLOW_FIX
 	// update client->baseline_cutoff
@@ -1241,7 +1249,9 @@ void SV_ClientEnterWorld( client_t *client ) {
 	}
 
 	client->state = CS_ACTIVE;
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 	client->gamestateAck = GSA_ACKED;
+#endif
 
 	client->oldServerTime = 0;
 
@@ -1390,9 +1400,13 @@ static void SV_BeginDownload_f( client_t *cl ) {
 
 	cl->downloading = qtrue;
 
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+	cl->downloadGamestateDropCheck = qtrue;
+#else
 	if ( cl->gamestateAck == GSA_ACKED ) {
 		cl->gamestateAck = GSA_SENT_ONCE;
 	}
+#endif
 }
 
 
@@ -2586,6 +2600,7 @@ USER CMD EXECUTION
 ===========================================================================
 */
 
+#ifndef STEF_REWORK_GAMESTATE_RETRANSMIT
 /*
 ===================
 SV_AcknowledgeGamestate
@@ -2607,6 +2622,7 @@ static qboolean SV_AcknowledgeGamestate( client_t *cl, int serverId )
 	}
 	return qfalse;
 }
+#endif
 
 
 /*
@@ -2668,6 +2684,14 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 
 	cl->justConnected = qfalse;
 
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+	if ( cl->oldServerTime && serverId == sv.serverId ) {
+		// this client has acknowledged the new gamestate so it's
+		// safe to start sending it the real time again
+		Com_DPrintf( "%s acknowledged gamestate\n", cl->name );
+		cl->oldServerTime = 0;
+	}
+#else
 	// cl->serverId = serverId;
 
 	// if this is a usercmd from a previous gamestate,
@@ -2695,6 +2719,7 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 		// in case of lost gamestate client replies with (messageAcknowledge - gamestateMessageNum) > 0 and (serverId == sv.serverId)
 		// in case of disconnect/etc. client replies with any serverId
 	//}
+#endif
 
 	// read optional clientCommand strings
 	do {
@@ -2715,6 +2740,31 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 		}
 	} while ( 1 );
 
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+	if ( cl->downloading ) {
+		// waiting for "donedl" command
+		return;
+	}
+
+	// check for sending initial gamestate
+	if ( cl->state == CS_CONNECTED ) {
+		if ( !SVC_RateLimit( &cl->gamestate_rate, 2, 1000 ) ) {
+			SV_SendClientGameState( cl );
+		}
+		return;
+	}
+
+	// check for dropped gamestate
+	if ( cl->state != CS_ACTIVE && serverId != sv.serverId ) {
+		if ( cl->messageAcknowledge - cl->gamestateMessageNum > 0 ) {
+			Com_DPrintf( "%s: dropped gamestate, resending\n", cl->name );
+			if ( !SVC_RateLimit( &cl->gamestate_rate, 2, 1000 ) ) {
+				SV_SendClientGameState( cl );
+			}
+		}
+		return;
+	}
+#else
 	if ( cl->gamestateAck != GSA_ACKED ) {
 		// late check for gamestate acknowledge & resend
 		if ( cl->state == CS_PRIMED ) {
@@ -2729,6 +2779,7 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 			return; // cl->state <= CS_CONNECTED
 		}
 	}
+#endif
 
 	// read the usercmd_t
 	if ( c == clc_move ) {
@@ -2741,4 +2792,23 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 //	if ( msg->readcount != msg->cursize ) {
 //		Com_Printf( "WARNING: Junk at end of packet for client %i\n", cl - svs.clients );
 //	}
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+	// extra check for dropped gamestate for post-UDP download clients, since after
+	// download client can have correct serverid but still be awaiting gamestate
+	if ( cl->downloadGamestateDropCheck ) {
+		const int gsDelta = cl->messageAcknowledge - cl->gamestateMessageNum;
+		// either a move command (implied by CS_ACTIVE) or exact acknowledge of
+		// gamestate message number implies client has the new gamestate
+		if ( cl->state == CS_ACTIVE || gsDelta == 0 ) {
+			Com_DPrintf( "%s: acknowledged post-download gamestate (state:%i gsDelta:%i)\n",
+					cl->name, cl->state, gsDelta );
+			cl->downloadGamestateDropCheck = qfalse;
+		} else if ( gsDelta > 20 ) {
+			Com_DPrintf( "%s: dropped post-download gamestate, resending\n", cl->name );
+			if ( !SVC_RateLimit( &cl->gamestate_rate, 2, 1000 ) ) {
+				SV_SendClientGameState( cl );
+			}
+		}
+	}
+#endif
 }

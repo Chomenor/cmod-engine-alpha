@@ -121,6 +121,10 @@
 // Aas files are often valid to use even if this checksum doesn't match.
 #define STEF_IGNORE_AAS_CHECKSUM
 
+// [TWEAK] Use alternative to some questionable dropped gamestate handling changes in Q3E.
+// Significantly simplifies code and fixes some potential issues involving UDP downloads.
+#define STEF_REWORK_GAMESTATE_RETRANSMIT
+
 // [BUGFIX] Workaround to allow certain older ioEF versions (e.g. 1.37) to successfully
 // negotiate protocol version and connect to the server.
 #define STEF_PROTOCOL_MSG_FIX

@@ -150,8 +150,12 @@ void SV_SetConfigstring (int index, const char *val) {
 		// send the data to all relevant clients
 		for (i = 0, client = svs.clients; i < sv.maxclients; i++, client++) {
 			if ( client->state < CS_ACTIVE ) {
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+				if ( client->state == CS_PRIMED ) {
+#else
 				if ( client->state == CS_PRIMED || client->state == CS_CONNECTED ) {
 					// track CS_CONNECTED clients as well to optimize gamestate acknowledge after downloading/retransmission
+#endif
 					client->csUpdated[index] = qtrue;
 				}
 				continue;
@@ -672,7 +676,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 				SV_DropClient( &svs.clients[i], denied );
 			} else {
 				if ( !isBot ) {
+#ifdef STEF_REWORK_GAMESTATE_RETRANSMIT
+					svs.clients[i].downloadGamestateDropCheck = qfalse;
+#else
 					svs.clients[i].gamestateAck = GSA_INIT; // resend gamestate, accept first correct serverId
+#endif
 					// when we get the next packet from a connected client,
 					// the new gamestate will be sent
 					svs.clients[i].state = CS_CONNECTED;
