@@ -152,6 +152,12 @@ void SV_AddServerCommand( client_t *client, const char *cmd ) {
 	if ( client->state < CS_PRIMED )
 		return;
 
+#ifdef STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+	if ( client->downloading ) {
+		return;
+	}
+#endif
+
 #ifdef STEF_SERVER_RECORD
 	Record_ProcessServercmd( client - svs.clients, cmd );
 #endif
