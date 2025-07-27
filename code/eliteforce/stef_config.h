@@ -121,6 +121,11 @@
 // Aas files are often valid to use even if this checksum doesn't match.
 #define STEF_IGNORE_AAS_CHECKSUM
 
+// [TWEAK] Don't send reliable commands to loading clients. These commands don't seem
+// necessary and may contribute to issues like stuck scoreboard when player joins server
+// around the same time as mid-round intermission (testing needed on this issue).
+#define STEF_SKIP_PRE_ACTIVE_COMMANDS
+
 // [TWEAK] Use alternative to some questionable dropped gamestate handling changes in Q3E.
 // Significantly simplifies code and fixes some potential issues involving UDP downloads.
 #define STEF_REWORK_GAMESTATE_RETRANSMIT

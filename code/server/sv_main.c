@@ -148,6 +148,12 @@ void SV_AddServerCommand( client_t *client, const char *cmd ) {
 //		return;
 //	}
 
+#ifdef STEF_SKIP_PRE_ACTIVE_COMMANDS
+	if ( client->state < CS_ACTIVE ) {
+		return;
+	}
+#endif
+
 	// do not send commands until the gamestate has been sent
 	if ( client->state < CS_PRIMED )
 		return;
