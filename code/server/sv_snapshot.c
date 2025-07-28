@@ -804,6 +804,13 @@ void SV_SendClientMessages( void )
 		if ( c->state == CS_CONNECTED )
 			continue;		// Client is downloading, don't send snapshots
 
+#ifdef STEF_UDP_DOWNLOAD_NO_DOUBLE_LOAD
+		// extra check since downloading clients can now be CS_PRIMED
+		if ( c->downloading ) {
+			continue;
+		}
+#endif
+
 		//if ( !c->gamestateAcked )
 		//	continue;		// waiting usercmd/downloading
 
