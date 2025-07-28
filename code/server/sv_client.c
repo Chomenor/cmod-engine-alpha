@@ -925,9 +925,16 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 	// add the disconnect command
 	if ( reason ) {
 #ifdef ELITEFORCE
-		if( drop->compat )
-			SV_SendServerCommand( drop, "disconnect %s", reason);
-		else
+		if ( drop->compat ) {
+			if ( !strcmp( reason, "was kicked" ) ) {
+				// Use "kicked" instead of "was kicked" as a workaround to fix message on ioEF clients
+				// running under compatibility protocol (e.g. 1.37).
+				// "kicked" and "was kicked" are interchangeable; see TranslateQuestion in ui_confirm.c
+				SV_SendServerCommand( drop, "disconnect kicked" );
+			} else {
+				SV_SendServerCommand( drop, "disconnect %s", reason );
+			}
+		} else
 #endif
 		SV_SendServerCommand( drop, "disconnect \"%s\"", reason );
 	}
