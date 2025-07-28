@@ -209,6 +209,14 @@ static void SV_WriteSnapshotToClient( const client_t *client, msg_t *msg ) {
 
 	// don't send any changes to zombies
 	if ( client->state <= CS_ZOMBIE ) {
+#ifdef ELITEFORCE
+		if ( client->compat ) {
+			MSG_WriteBits( msg, 0, 32 );
+			MSG_WriteBits( msg, 0, 20 );
+			MSG_WriteBits( msg, (MAX_GENTITIES-1), GENTITYNUM_BITS );
+			return;
+		}
+#endif
 		// playerstate
 		MSG_WriteByte( msg, 0 ); // # of changes
 		MSG_WriteBits( msg, 0, 1 ); // no array changes
