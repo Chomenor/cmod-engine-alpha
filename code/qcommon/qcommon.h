@@ -244,11 +244,7 @@ qboolean	NET_Sleep( int timeout );
 
 #define MAX_DOWNLOAD_WINDOW		48	// ACK window of 48 download chunks. Cannot set this higher, or clients
 						// will overflow the reliable commands buffer
-#ifdef STEF_INCREASE_DOWNLOAD_BLOCK_SIZE
-#define MAX_DOWNLOAD_BLKSIZE		4096
-#else
 #define MAX_DOWNLOAD_BLKSIZE		1024	// 896 byte block chunks
-#endif
 
 #define NETCHAN_GENCHECKSUM(challenge, sequence) ((challenge) ^ ((sequence) * (challenge)))
 

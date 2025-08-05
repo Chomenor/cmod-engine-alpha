@@ -151,9 +151,6 @@
 // a player with certain long model names to crash other clients under certain conditions.
 #define STEF_MODEL_NAME_LENGTH_LIMIT
 
-// [BUGFIX] Increase max UDP download size from 32MB to 128MB by increasing block size.
-#define STEF_INCREASE_DOWNLOAD_BLOCK_SIZE
-
 // [BUGFIX] Workaround for game code bug when creating EV_SHIELD_HIT event.
 // This fixes the green shield effect so it is displayed reliably, unlike the original
 // game where it depended on the position/visibility of the player relative to the map's
