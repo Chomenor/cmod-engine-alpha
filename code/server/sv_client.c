@@ -1624,7 +1624,7 @@ static qboolean SV_ReadDownloadBlock( client_t *cl, char **dataOut, int *sizeOut
 	int tgtSize = SV_GetDownloadBlockSize( cl );
 	int dataPos = 0;
 	msg_t msg;
-	char msgBuffer[MAX_MSGLEN_BUF];
+	byte msgBuffer[MAX_MSGLEN_BUF];
 	char data[16384];	// size matches CL_ParseDownload
 
 #ifdef ELITEFORCE
@@ -2066,7 +2066,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 			SV_DropClient( cl, "unexpected download current block number" );
 			return 0;
 		}
-		if ( !SV_ReadDownloadBlock( cl, &cl->downloadBlocks[curindex], &cl->downloadBlockSize[curindex] ) ) {
+		if ( !SV_ReadDownloadBlock( cl, (char **)&cl->downloadBlocks[curindex], &cl->downloadBlockSize[curindex] ) ) {
 			SV_DropClient( cl, "failed to read download pk3" );
 			return 0;
 		}
