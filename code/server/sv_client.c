@@ -1297,6 +1297,37 @@ CLIENT COMMAND EXECUTION
 ============================================================
 */
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+// Size of chunks to read from source pk3
+// Server-side only; does not affect outgoing messages
+#define DOWNLOAD_READ_CHUNK_SIZE 16384
+
+// Rate control constants
+#define DOWNLOAD_MAX_RATE 5000	// in KB/s
+#define DOWNLOAD_MIN_RATE 250	// in KB/s (burst rate; overall speed may be slower due to transmit window)
+#define DOWNLOAD_RETRANSMIT_RATE_DECREASE( oldRate ) oldRate * 0.8	// on retransmit
+#define DOWNLOAD_RATE_INCREASE( oldRate, blockSize ) oldRate + blockSize / 200.0	// on block acknowledge
+
+// Max bytes per packet. Should match FRAGMENT_SIZE in net_chan.c
+#define DOWNLOAD_FRAGMENT_SIZE 1300
+
+// Assumed size of packet for rate limiting purposes (account for a bit of overhead)
+#define DOWNLOAD_RATE_PACKET_SIZE ( DOWNLOAD_FRAGMENT_SIZE + 100 )
+
+// Maximum full-size packets allowed per block
+// Roughly MAX_MSGLEN / DOWNLOAD_FRAGMENT_SIZE
+#define DOWNLOAD_MAX_PACKETS_PER_BLOCK 12
+
+#define DOWNLOAD_MAX_PACKETS_PER_MS ( DOWNLOAD_MAX_RATE / DOWNLOAD_FRAGMENT_SIZE + 2 )
+
+// For certain purposes, don't treat client download rate as higher than global rate limit
+#define DOWNLOAD_CLIENT_RATE( cl ) ( sv_dlRate->integer > 0 && sv_dlRate->integer < cl->downloadCurrentRate ? \
+		sv_dlRate->integer : cl->downloadCurrentRate )
+
+// Max unacknowledged bytes to send (should be enough to accommodate client ping)
+#define DOWNLOAD_WINDOW_BYTES( cl ) ( DOWNLOAD_CLIENT_RATE( cl ) * 200 )
+#endif
+
 /*
 ==================
 SV_CloseDownload
@@ -1323,6 +1354,12 @@ static void SV_CloseDownload( client_t *cl ) {
 		}
 	}
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	if ( cl->downloadSrcChunk ) {
+		Z_Free( cl->downloadSrcChunk );
+		cl->downloadSrcChunk = NULL;
+	}
+#endif
 }
 
 
@@ -1385,6 +1422,26 @@ static void SV_NextDownload_f( client_t *cl )
 {
 	int block = atoi( Cmd_Argv(1) );
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	if ( cl->download && block == cl->downloadClientBlock && block < cl->downloadCurrentBlock ) {
+		int blockIndex = cl->downloadClientBlock % MAX_DOWNLOAD_WINDOW;
+		Com_DPrintf( "clientDownload: %d : client acknowledge of block %d\n", (int) (cl - svs.clients), block );
+
+		// Find out if we are done.  A zero-length block indicates EOF
+		if (cl->downloadBlockSize[blockIndex] == 0) {
+			Com_Printf( "clientDownload: %d : file \"%s\" completed\n", (int) (cl - svs.clients), cl->downloadName );
+			SV_CloseDownload( cl );
+			return;
+		}
+
+		// Gradually increment rate
+		cl->downloadCurrentRate = DOWNLOAD_RATE_INCREASE( cl->downloadCurrentRate, cl->downloadBlockSize[blockIndex] );
+		if ( cl->downloadCurrentRate > DOWNLOAD_MAX_RATE ) {
+			cl->downloadCurrentRate = DOWNLOAD_MAX_RATE;
+		}
+
+		cl->downloadClientBlock++;
+#else
 	if (block == cl->downloadClientBlock) {
 		Com_DPrintf( "clientDownload: %d : client acknowledge of block %d\n", (int) (cl - svs.clients), block );
 
@@ -1397,6 +1454,7 @@ static void SV_NextDownload_f( client_t *cl )
 
 		cl->downloadSendTime = svs.time;
 		cl->downloadClientBlock++;
+#endif
 		return;
 	}
 	// We aren't getting an acknowledge for the correct block, drop the client
@@ -1513,6 +1571,140 @@ static qboolean SV_OpenDownload( client_t *cl ) {
 }
 #endif
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+/*
+==================
+SV_GetDownloadBlockSize
+
+Determine amount of download data to fit into block. Try to get an amount that
+fragments cleanly so each packet has close to the maximum amount of data.
+==================
+*/
+static int SV_GetDownloadBlockSize( client_t *cl ) {
+	// Make sure blocksize is large enough to support large pk3 by a safe margin
+	int paksizeBytesPerBlock = ( cl->downloadSize / 32768 ) * 2 + 50;
+
+	// Make sure blocksize is large enough to avoid block window bottleneck
+	int rateBytesPerBlock = DOWNLOAD_WINDOW_BYTES( cl ) / MAX_DOWNLOAD_WINDOW;
+
+	// Use smallest packet count that meets pk3s size and rate requirements, since
+	// smaller blocks have much better packet loss tolerance
+	int bytesPerBlock = paksizeBytesPerBlock > rateBytesPerBlock ? paksizeBytesPerBlock : rateBytesPerBlock;
+	int packetsPerBlock = bytesPerBlock / DOWNLOAD_FRAGMENT_SIZE + 1;
+
+	// Force small blocks at beginning of download to help with high packet loss scenarios
+	if ( packetsPerBlock > cl->downloadClientBlock / 4 ) {
+		packetsPerBlock = cl->downloadClientBlock / 4;
+	}
+
+	if ( packetsPerBlock > DOWNLOAD_MAX_PACKETS_PER_BLOCK ) {
+		packetsPerBlock = DOWNLOAD_MAX_PACKETS_PER_BLOCK;
+	}
+
+	if ( packetsPerBlock < 1 ) {
+		packetsPerBlock = 1;
+	}
+
+	// Reduce size a bit to allow for overhead
+	return packetsPerBlock * DOWNLOAD_FRAGMENT_SIZE - 50;
+}
+
+/*
+==================
+SV_ReadDownloadBlock
+
+Reads a new download block from source pk3 and writes to dataOut/sizeOut.
+
+On success: Returns true and sizeOut > 0.
+On end of file: Returns true and sizeOut = 0.
+On error: Returns false (client should be dropped).
+==================
+*/
+static qboolean SV_ReadDownloadBlock( client_t *cl, char **dataOut, int *sizeOut ) {
+	int tgtSize = SV_GetDownloadBlockSize( cl );
+	int dataPos = 0;
+	msg_t msg;
+	char msgBuffer[MAX_MSGLEN_BUF];
+	char data[16384];	// size matches CL_ParseDownload
+
+#ifdef ELITEFORCE
+	if ( cl->compat ) {
+		MSG_InitOOB( &msg, msgBuffer, MAX_MSGLEN );
+	} else
+#endif
+	MSG_Init( &msg, msgBuffer, MAX_MSGLEN );
+
+	while ( msg.cursize < tgtSize && dataPos < sizeof( data ) ) {
+		if ( cl->downloadSrcChunkPos >= cl->downloadSrcChunkSize ) {
+			// check for end of file
+			if ( cl->downloadSrcFileRemaining <= 0 ) {
+				break;
+			}
+
+			// read next source chunk
+			cl->downloadSrcChunkSize = cl->downloadSrcFileRemaining < DOWNLOAD_READ_CHUNK_SIZE ?
+					cl->downloadSrcFileRemaining : DOWNLOAD_READ_CHUNK_SIZE;
+			if ( FS_Read( cl->downloadSrcChunk, cl->downloadSrcChunkSize, cl->download ) != (int)cl->downloadSrcChunkSize ) {
+				return qfalse;
+			}
+			cl->downloadSrcFileRemaining -= cl->downloadSrcChunkSize;
+			cl->downloadSrcChunkPos = 0;
+		}
+
+		// add byte to message
+		data[dataPos] = cl->downloadSrcChunk[cl->downloadSrcChunkPos++];
+		MSG_WriteByte( &msg, ( (unsigned char *)data )[dataPos] );
+		++dataPos;
+	}
+
+	*sizeOut = dataPos;
+	if ( *dataOut ) {
+		Z_Free( *dataOut );
+	}
+	*dataOut = Z_Malloc( dataPos );
+	Com_Memcpy( *dataOut, data, dataPos );
+	return qtrue;
+}
+
+/*
+==================
+SV_DownloadRetransmit
+==================
+*/
+static void SV_DownloadRetransmit( client_t *cl ) {
+	cl->downloadXmitBlock = cl->downloadClientBlock;
+	cl->downloadRetransmitMsg = cl->downloadCurrentMsg;
+
+	// Decrease current rate due to dropped blocks.
+	// It will climb back up as blocks are acknowledged, but if the lower rate is needed
+	// due to some connection issues, this should at least provide a temporary period for
+	// the download to limp forward rather than stalling completely.
+	cl->downloadCurrentRate = DOWNLOAD_RETRANSMIT_RATE_DECREASE( cl->downloadCurrentRate );
+	if ( cl->downloadCurrentRate < DOWNLOAD_MIN_RATE ) {
+		cl->downloadCurrentRate = DOWNLOAD_MIN_RATE;
+	}
+
+	Logging_Printf( LP_INFO, "SV_DOWNLOAD", "download: currentRate set to %f due to retransmit\n",
+			cl->downloadCurrentRate );
+}
+
+/*
+==================
+SV_DownloadCountOutgoingBytes
+
+Returns number of bytes sent to client but not yet acknowledged.
+==================
+*/
+static int SV_DownloadCountOutgoingBytes( client_t *cl ) {
+	int i;
+	int count = 0;
+	for ( i = cl->downloadClientMsg; i < cl->downloadCurrentMsg; ++i ) {
+		count += cl->downloadMsgTable[i % MAX_DOWNLOAD_MESSAGE_HISTORY].size;
+	}
+	return count;
+}
+#endif
+
 /*
 ==================
 SV_WriteDownloadToClient
@@ -1521,7 +1713,11 @@ Check to see if the client wants a file, open it if needed and start pumping the
 Fill up msg with data, return number of download blocks added
 ==================
 */
+#ifdef STEF_LOGGING_DEFS
+LOGFUNCTION_RET( int, SV_WriteDownloadToClient, ( client_t *cl ), ( cl ), NULL )
+#else
 static int SV_WriteDownloadToClient( client_t *cl )
+#endif
 {
 	int curindex;
 #ifndef NEW_FILESYSTEM
@@ -1531,7 +1727,13 @@ static int SV_WriteDownloadToClient( client_t *cl )
 	int numRefPaks;
 #endif
 	msg_t msg;
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	int curtime = Sys_Milliseconds();
+	qboolean skip = qfalse;
+	byte msgBuffer[MAX_MSGLEN_BUF];
+#else
 	byte msgBuffer[MAX_DOWNLOAD_BLKSIZE*2+8];
+#endif
 
 	if ( cl->download == FS_INVALID_HANDLE ) {
 #ifdef STEF_LUA_SUPPORT
@@ -1674,10 +1876,74 @@ static int SV_WriteDownloadToClient( client_t *cl )
 		Com_Printf( "clientDownload: %d : beginning \"%s\"\n", (int) (cl - svs.clients), cl->downloadName );
 
 		cl->downloadCurrentBlock = cl->downloadClientBlock = cl->downloadXmitBlock = 0;
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+		cl->downloadSrcFileRemaining = cl->downloadSize;
+		cl->downloadSrcChunkPos = 0;
+		cl->downloadSrcChunkSize = 0;
+		cl->downloadCurrentBlock = 0;
+		cl->downloadSrcChunk = Z_Malloc( DOWNLOAD_READ_CHUNK_SIZE );
+		cl->downloadSrcChunkPos = cl->downloadSrcChunkSize = 0;
+		cl->downloadClientMsg = cl->downloadRetransmitMsg = cl->downloadCurrentMsg = 0;
+		cl->downloadLastSentTime = curtime;
+		cl->downloadCurrentRate = DOWNLOAD_MAX_RATE;
+		cl->downloadRatePool = 0;
+#else
 		cl->downloadCount = 0;
 		cl->downloadEOF = qfalse;
+#endif
 	}
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	// Send next packet of fragmented message
+	if ( cl->netchan.unsentFragments || cl->netchan_start_queue ) {
+		SV_Netchan_TransmitNextFragment( cl );
+		cl->downloadLastSentTime = curtime;
+		return 1;
+	}
+
+	// Check acknowledged messages
+	while ( cl->downloadClientMsg < cl->downloadCurrentMsg ) {
+		downloadMessageRecord_t *record = &cl->downloadMsgTable[cl->downloadClientMsg % MAX_DOWNLOAD_MESSAGE_HISTORY];
+		if ( cl->messageAcknowledge < record->msgNumber ) {
+			break;
+		}
+		if ( record->blockNumber >= cl->downloadClientBlock && cl->downloadClientMsg >= cl->downloadRetransmitMsg ) {
+			Logging_Printf( LP_INFO, "SV_DOWNLOAD", "download: reset due to msg acknowledge with dropped block\n" );
+			SV_DownloadRetransmit( cl );
+		}
+		++cl->downloadClientMsg;
+	}
+
+	if ( cl->downloadXmitBlock > 0 &&
+			cl->downloadBlockSize[( cl->downloadXmitBlock - 1 ) % MAX_DOWNLOAD_WINDOW] == 0 ) {
+		// Sent the final block
+		if ( cl->downloadClientBlock >= cl->downloadXmitBlock ) {
+			// Client already acked (shouldn't happen -
+			// download should be closed in SV_NextDownload_f)
+			Logging_Printf( LP_CONSOLE, "SV_DOWNLOAD WARNINGS", "WARNING: attempt to write completed download\n" );
+			return 0;
+		} else {
+			Logging_Printf( LP_INFO, "SV_DOWNLOAD SV_DOWNLOAD_SKIP", "download: skip due to final block sent\n" );
+			skip = qtrue;
+		}
+	}
+
+	else if ( cl->downloadXmitBlock - cl->downloadClientBlock >= MAX_DOWNLOAD_WINDOW ) {
+		Logging_Printf( LP_INFO, "SV_DOWNLOAD SV_DOWNLOAD_SKIP", "download: skip due to download window (max blocks)\n" );
+		skip = qtrue;
+	}
+
+	else if ( SV_DownloadCountOutgoingBytes( cl ) > DOWNLOAD_WINDOW_BYTES( cl ) ) {
+		Logging_Printf( LP_INFO, "SV_DOWNLOAD SV_DOWNLOAD_SKIP", "download: skip due to download window (max bytes)\n" );
+		skip = qtrue;
+	}
+
+	// If skip is set, either return here, or if 500ms has elapsed since last sent
+	// message, continue forward to send keepalive message.
+	if ( skip && curtime - cl->downloadLastSentTime < 500 ) {
+		return 0;
+	}
+#else
 	// Perform any reads that we need to
 	while (cl->downloadCurrentBlock - cl->downloadClientBlock < MAX_DOWNLOAD_WINDOW &&
 		cl->downloadSize != cl->downloadCount) {
@@ -1725,6 +1991,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 		else
 			return 0;
 	}
+#endif
 
 	// Send current block
 	curindex = (cl->downloadXmitBlock % MAX_DOWNLOAD_WINDOW);
@@ -1768,12 +2035,44 @@ static int SV_WriteDownloadToClient( client_t *cl )
 	done_message_init:
 #endif
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	if ( skip ) {
+		// Send an empty message with no download block to update message sequence number on
+		// the client. Fixes potential deadlock due to dropped messages in which client is
+		// stuck on old sequence number and server is stuck due to full download window.
+		Logging_Printf( LP_INFO, "SV_DOWNLOAD", "download: writing keepalive message\n" );
+#ifdef ELITEFORCE
+		if ( !cl->compat )
+#endif
+		MSG_WriteByte( &msg, svc_EOF );
+		SV_Netchan_Transmit( cl, &msg );
+		cl->downloadLastSentTime = curtime;
+		return 1;
+	}
+#endif
+
 	MSG_WriteByte( &msg, svc_download );
 	MSG_WriteShort( &msg, cl->downloadXmitBlock );
 
 	// block zero is special, contains file size
 	if ( cl->downloadXmitBlock == 0 )
 		MSG_WriteLong( &msg, cl->downloadSize );
+
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	// Read next current block from pk3 if needed
+	if ( cl->downloadXmitBlock >= cl->downloadCurrentBlock ) {
+		if ( cl->downloadXmitBlock != cl->downloadCurrentBlock ) {
+			// shouldn't happen
+			SV_DropClient( cl, "unexpected download current block number" );
+			return 0;
+		}
+		if ( !SV_ReadDownloadBlock( cl, &cl->downloadBlocks[curindex], &cl->downloadBlockSize[curindex] ) ) {
+			SV_DropClient( cl, "failed to read download pk3" );
+			return 0;
+		}
+		cl->downloadCurrentBlock = cl->downloadXmitBlock + 1;
+	}
+#endif
 
 	MSG_WriteShort( &msg, cl->downloadBlockSize[curindex] );
 
@@ -1789,10 +2088,32 @@ static int SV_WriteDownloadToClient( client_t *cl )
 
 	Com_DPrintf( "clientDownload: %d : writing block %d\n", (int) (cl - svs.clients), cl->downloadXmitBlock );
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	// In case of MAX_DOWNLOAD_MESSAGE_HISTORY overflow delete top entry to make space
+	if ( cl->downloadCurrentMsg - cl->downloadClientMsg >= MAX_DOWNLOAD_MESSAGE_HISTORY ) {
+		Logging_Printf( LP_INFO, "SV_DOWNLOAD", "download: message history overflow\n" );
+		++cl->downloadClientMsg;
+	}
+
+	// Generate message entry
+	{
+		downloadMessageRecord_t *record = &cl->downloadMsgTable[cl->downloadCurrentMsg++ % MAX_DOWNLOAD_MESSAGE_HISTORY];
+		record->blockNumber = cl->downloadXmitBlock;
+		record->msgNumber = cl->netchan.outgoingSequence;
+		record->size = cl->downloadBlockSize[curindex];
+		Logging_Printf( LP_INFO, "SV_DOWNLOAD_OUTGOING", "download: outgoing size %i\n", SV_DownloadCountOutgoingBytes( cl ) );
+	}
+
+	cl->downloadLastSentTime = curtime;
+
+	// Move on to the next block
+	cl->downloadXmitBlock++;
+#else
 	// Move on to the next block
 	// It will get sent with next snap shot.  The rate will keep us in line.
 	cl->downloadXmitBlock++;
 	cl->downloadSendTime = svs.time;
+#endif
 
 	return 1;
 }
@@ -1814,6 +2135,13 @@ int SV_SendQueuedMessages( void )
 	for( i = 0; i < sv.maxclients; i++ )
 	{
 		cl = &svs.clients[i];
+
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+		if ( *cl->downloadName ) {
+			// handled via SV_SendDownloadMessages
+			continue;
+		}
+#endif
 
 		if ( cl->state )
 		{
@@ -1840,6 +2168,76 @@ Send one round of download messages to all clients
 */
 int SV_SendDownloadMessages( void )
 {
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	// Pending bytes should hold up to 5ms worth of traffic, or ~1.5 packets, whichever is higher
+	#define MAX_PENDING_BYTES( rate ) ( ( rate ) * 5 > DOWNLOAD_RATE_PACKET_SIZE * 3 / 2 ? \
+			( rate ) * 5 : DOWNLOAD_RATE_PACKET_SIZE * 3 / 2 )
+	static int lastTime;
+	static unsigned int currentClient = 0;
+	static int globalRatePool;	// bytes available to send
+	int round;
+	int i;
+	int curtime = Sys_Milliseconds();
+	int timeElapsed = curtime - lastTime;
+	int globalRate = sv_dlRate->integer > 0 && sv_dlRate->integer < 100000 ? sv_dlRate->integer : 100000;	// KB/s
+	qboolean downloadsActive = qfalse;
+
+	// update elapsed time
+	if ( timeElapsed < 0 ) {
+		timeElapsed = 0;
+	}
+	if ( timeElapsed > 5 ) {
+		timeElapsed = 5;
+	}
+	lastTime = curtime;
+
+	// increment global rate
+	globalRatePool += globalRate * timeElapsed;
+	if ( globalRatePool > MAX_PENDING_BYTES( globalRate ) ) {
+		globalRatePool = MAX_PENDING_BYTES( globalRate );
+	}
+
+	// increment client rates
+	for ( i = 0; i < sv_maxclients->integer; i++ ) {
+		client_t *cl = cl = &svs.clients[i];
+		if ( cl->state >= CS_CONNECTED && *cl->downloadName ) {
+			cl->downloadRatePool += cl->downloadCurrentRate * timeElapsed;
+			if ( cl->downloadRatePool > MAX_PENDING_BYTES( DOWNLOAD_CLIENT_RATE( cl ) ) ) {
+				cl->downloadRatePool = MAX_PENDING_BYTES( DOWNLOAD_CLIENT_RATE( cl ) );
+			}
+		}
+	}
+
+	// send download packets
+	for ( round = 0; round < DOWNLOAD_MAX_PACKETS_PER_MS; round++ ) {
+		for ( i = 0; i < sv_maxclients->integer; i++ ) {
+			client_t *cl = &svs.clients[currentClient];
+			currentClient = ( currentClient + 1 ) % sv_maxclients->integer;
+			if ( cl->state >= CS_CONNECTED && *cl->downloadName ) {
+				downloadsActive = qtrue;
+				if ( globalRatePool < DOWNLOAD_RATE_PACKET_SIZE ) {
+					goto end;
+				}
+				if ( cl->downloadCurrentRate > 0.0 ) {
+					if ( cl->downloadRatePool < DOWNLOAD_RATE_PACKET_SIZE ) {
+						continue;
+					}
+					cl->downloadRatePool -= DOWNLOAD_RATE_PACKET_SIZE;
+				}
+				if ( SV_WriteDownloadToClient( cl ) ) {
+					globalRatePool -= DOWNLOAD_RATE_PACKET_SIZE;
+				}
+			}
+		}
+		if ( !downloadsActive ) {
+			break;
+		}
+	}
+
+	end:
+	// for now, just use 1ms wait when downloads are running
+	return downloadsActive ? 1 : INT_MAX;
+#else
 	int i, numDLs = 0;
 	client_t *cl;
 
@@ -1853,6 +2251,7 @@ int SV_SendDownloadMessages( void )
 	}
 
 	return numDLs;
+#endif
 }
 
 

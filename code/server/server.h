@@ -158,6 +158,16 @@ typedef enum {
 } gameStateAck_t;
 #endif
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+#define MAX_DOWNLOAD_MESSAGE_HISTORY 64
+
+typedef struct {
+	int blockNumber;
+	int msgNumber;
+	int size;
+} downloadMessageRecord_t;
+#endif
+
 typedef struct client_s {
 	clientState_t	state;
 	char			userinfo[MAX_INFO_STRING];		// name, etc
@@ -185,6 +195,37 @@ typedef struct client_s {
 	// int				serverId;		// last acknowledged serverId
 
 	// downloading
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	char			downloadName[MAX_QPATH];	// if not empty string, we are downloading
+
+	// source file
+	fileHandle_t	download;					// file being downloaded
+	int				downloadSize;				// total bytes in pk3
+	unsigned int	downloadSrcFileRemaining;	// number of bytes left to read from file
+
+	// file read buffer
+	char			*downloadSrcChunk;			// current chunk buffer
+	unsigned int	downloadSrcChunkPos;		// number of bytes read from current chunk
+	unsigned int	downloadSrcChunkSize;		// total bytes in current chunk
+
+	// download blocks
+	unsigned char	*downloadBlocks[MAX_DOWNLOAD_WINDOW];
+	int				downloadBlockSize[MAX_DOWNLOAD_WINDOW];
+	int				downloadClientBlock;		// one more than last block acknowledged by client
+	int				downloadXmitBlock;			// one more than last block sent (may go backwards for retransmit)
+	int				downloadCurrentBlock;		// one more than last block generated on server
+
+	// download messages
+	downloadMessageRecord_t downloadMsgTable[MAX_DOWNLOAD_MESSAGE_HISTORY];
+	int				downloadClientMsg;			// one more than last msg (table index) acknowledged by client
+	int				downloadRetransmitMsg;		// first message (table index) since xmit block was reset for retransmit
+	int				downloadCurrentMsg;			// one more than last msg (table index) generated on server
+	int				downloadLastSentTime;		// time in Sys_Milliseconds of last outgoing packet
+
+	// rate limiting
+	double			downloadCurrentRate;		// rate in KB/s
+	int				downloadRatePool;			// bytes available to send
+#else
 	char			downloadName[MAX_QPATH]; // if not empty string, we are downloading
 	fileHandle_t	download;			// file being downloaded
  	int				downloadSize;		// total bytes (can't use EOF because of paks)
@@ -196,6 +237,7 @@ typedef struct client_s {
 	int				downloadBlockSize[MAX_DOWNLOAD_WINDOW];
 	qboolean		downloadEOF;		// We have sent the EOF block
 	int				downloadSendTime;	// time we last got an ack from the client
+#endif
 
 	int				deltaMessage;		// frame last client usercmd message
 	int				lastPacketTime;		// svs.time when packet was last received

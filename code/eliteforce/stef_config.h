@@ -87,6 +87,11 @@
 // engine) for alt swapping, this handler is the preferred and most reliable method.
 #define STEF_SERVER_ALT_SWAP_SUPPORT
 
+// [FEATURE] Improved UDP download rate control for better performance, especially
+// on slower or less stable connections. Also includes support for downloads larger
+// than 32MB via increased block size.
+#define STEF_UDP_DOWNLOAD_OPTIMIZE
+
 // [TWEAK] Disable auto-running or saving config files in dedicated server build.
 // Only settings manually specified using e.g. exec on command line are loaded.
 #if defined( DEDICATED )

@@ -1558,16 +1558,26 @@ Return the time in msec until we expect to be called next
 */
 int SV_SendQueuedPackets( void )
 {
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	int delayT;
+	int timeVal = INT_MAX;
+#else
 	int numBlocks;
 	int dlStart, deltaT, delayT;
 	static int dlNextRound = 0;
 	int timeVal = INT_MAX;
+#endif
 
 	// Send out fragmented packets now that we're idle
 	delayT = SV_SendQueuedMessages();
 	if(delayT >= 0)
 		timeVal = delayT;
 
+#ifdef STEF_UDP_DOWNLOAD_OPTIMIZE
+	delayT = SV_SendDownloadMessages();
+	if(delayT >= 0 && delayT < timeVal)
+		timeVal = delayT;
+#else
 	if(sv_dlRate->integer)
 	{
 		// Rate limiting. This is very imprecise for high
@@ -1622,6 +1632,7 @@ int SV_SendQueuedPackets( void )
 		if(SV_SendDownloadMessages())
 			timeVal = 0;
 	}
+#endif
 
 	return timeVal;
 }
