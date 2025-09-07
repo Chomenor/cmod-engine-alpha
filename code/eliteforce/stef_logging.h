@@ -28,13 +28,12 @@ typedef enum {
 	LP_CONSOLE,		// Always print to console.
 } loggingPrintType_t;
 
-void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg );
-void QDECL Logging_PrintfExt( loggingPrintType_t printType, const char *conditions, int entityNum, const char *fmt, ... );
+void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, const char *msg );
 void QDECL Logging_Printf( loggingPrintType_t printType, const char *conditions, const char *fmt, ... );
 #endif
 
 #ifdef STEF_LOGGING_SYSTEM
-void Logging_FrameEntry( const char *log_conditions, const char *name, int entity_num, int info_value, qboolean reallocate_name );
+void Logging_FrameEntry( const char *log_conditions, const char *name, int info_value, qboolean reallocate_name );
 void Logging_FrameExit( const char *name );
 void QDECL Logging_RegisterCrash( const char *fmt, ... );
 int Logging_FrameCount( void );
@@ -46,7 +45,7 @@ void Logging_PrintStack( loggingPrintType_t printType, const char *conditions );
 	prefix1 returntype prefix2 name ## _unlogged typedparams; \
 	prefix1 returntype prefix2 name typedparams { \
 		returntype result; \
-		Logging_FrameEntry( logcond, #name, entity_num, info_value, qfalse ); \
+		Logging_FrameEntry( logcond, #name, info_value, qfalse ); \
 		result = name ## _unlogged untypedparams; \
 		Logging_FrameExit( #name ); \
 		return result; \
@@ -61,18 +60,10 @@ void Logging_PrintStack( loggingPrintType_t printType, const char *conditions );
 #define LOGFUNCTION_SRET( returntype, name, typedparams, untypedparams, logcond ) \
 	LOGFUNCTION_XRET( static, returntype, , name, typedparams, untypedparams, logcond, -1, 0 )
 
-// Returning function with entity num tag
-#define LOGFUNCTION_ERET( returntype, name, typedparams, untypedparams, entity_num, logcond ) \
-	LOGFUNCTION_XRET( , returntype, , name, typedparams, untypedparams, logcond, entity_num, 0 )
-
-// Static returning function with entity num tag
-#define LOGFUNCTION_SERET( returntype, name, typedparams, untypedparams, entity_num, logcond ) \
-	LOGFUNCTION_XRET( static, returntype, , name, typedparams, untypedparams, logcond, entity_num, 0 )
-
 #define LOGFUNCTION_XVOID( prefix1, prefix2, name, typedparams, untypedparams, logcond, entity_num, info_value ) \
 	prefix1 void prefix2 name ## _unlogged typedparams; \
 	prefix1 void prefix2 name typedparams { \
-		Logging_FrameEntry( logcond, #name, entity_num, info_value, qfalse ); \
+		Logging_FrameEntry( logcond, #name, info_value, qfalse ); \
 		name ## _unlogged untypedparams; \
 		Logging_FrameExit( #name ); \
 	} \
@@ -85,12 +76,4 @@ void Logging_PrintStack( loggingPrintType_t printType, const char *conditions );
 // Static void function
 #define LOGFUNCTION_SVOID( name, typedparams, untypedparams, logcond ) \
 	LOGFUNCTION_XVOID( static, , name, typedparams, untypedparams, logcond, -1, 0 )
-
-// Void function with entity num tag
-#define LOGFUNCTION_EVOID( name, typedparams, untypedparams, entity_num, logcond ) \
-	LOGFUNCTION_XVOID( , , name, typedparams, untypedparams, logcond, entity_num, 0 )
-
-// Static void function with entity num tag
-#define LOGFUNCTION_SEVOID( name, typedparams, untypedparams, entity_num, logcond ) \
-	LOGFUNCTION_XVOID( static, , name, typedparams, untypedparams, logcond, entity_num, 0 )
 #endif

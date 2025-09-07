@@ -304,10 +304,12 @@ void FORMAT_PRINTF(1, 2) QDECL Com_DPrintf( const char *fmt, ... ) {
 			return;
 		}
 
-		// don't generate a duplicate event in Com_Printf
-		stef_lua_suppress_print_event = qtrue;
-		Com_Printf( S_COLOR_CYAN "%s", msg );
-		stef_lua_suppress_print_event = qfalse;
+		if ( com_developer && com_developer->integer ) {
+			// don't generate a duplicate event in Com_Printf
+			stef_lua_suppress_print_event = qtrue;
+			Com_Printf( S_COLOR_CYAN "%s", msg );
+			stef_lua_suppress_print_event = qfalse;
+		}
 		return;
 	}
 #endif
@@ -340,7 +342,7 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	int			currentTime;
 
 #ifdef STEF_LOGGING_DEFS
-	Logging_FrameEntry( "CLIENTSTATE", "Com_Error", -1, 0, qfalse );
+	Logging_FrameEntry( "CLIENTSTATE", "Com_Error", 0, qfalse );
 #endif
 
 #if defined(_WIN32) && defined(_DEBUG)
@@ -4464,7 +4466,7 @@ Com_Frame
 =================
 */
 #ifdef STEF_LOGGING_DEFS
-LOGFUNCTION_VOID( Com_Frame, (qboolean noDelay), (noDelay), "CLIENTSTATE!-2" ) {
+LOGFUNCTION_VOID( Com_Frame, (qboolean noDelay), (noDelay), "CLIENTSTATE_FRAME" ) {
 #else
 void Com_Frame( qboolean noDelay ) {
 #endif

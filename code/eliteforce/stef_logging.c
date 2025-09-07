@@ -40,9 +40,6 @@ typedef struct {
 typedef struct {
 	const char *name;
 
-	// Game entity / player num (-1 for none)
-	int entity_num;
-
 	// Extra values that can be used to convey frame-specific debug info
 	const char *conditions;
 	const char *info_str;
@@ -106,8 +103,8 @@ void QDECL Logging_RegisterCrash( const char *fmt, ... ) {
 		va_start( argptr, fmt );
 		Q_vsnprintf( logging_frozen_reason, sizeof( logging_frozen_reason ), fmt, argptr );
 		va_end( argptr );
-		Logging_Printf( LP_CONSOLE, "WARNINGS!1 CRASH", "WARNING: freezing frame logging state - %s\n", logging_frozen_reason );
-		Logging_PrintStack( LP_CONSOLE, "WARNINGS!1 CRASH" );
+		Logging_Printf( LP_CONSOLE, "WARNINGS CRASH", "WARNING: freezing frame logging state - %s\n", logging_frozen_reason );
+		Logging_PrintStack( LP_CONSOLE, "WARNINGS CRASH" );
 	}
 }
 
@@ -118,7 +115,7 @@ Logging_FrameLogEntry
 Log function entry in frame table.
 ==================
 */
-void Logging_FrameEntry( const char *log_conditions, const char *name, int entity_num, int info_value, qboolean reallocate_name ) {
+void Logging_FrameEntry( const char *log_conditions, const char *name, int info_value, qboolean reallocate_name ) {
 	if ( logging_frozen ) {
 		return;
 	}
@@ -133,7 +130,6 @@ void Logging_FrameEntry( const char *log_conditions, const char *name, int entit
 	logging_frame_t *frame = &logging_frames[logging_frame_count];
 	logging_frame_storage_t *storage = &logging_frame_storage[logging_frame_count];
 
-	frame->entity_num = entity_num;
 	frame->conditions = log_conditions;
 	frame->info_value = info_value;
 	frame->info_str = 0;
@@ -248,9 +244,6 @@ void Logging_GetLuaFrameInfo( int frameNum ) {
 		if ( frame->conditions && *frame->conditions ) {
 			Stef_Lua_PushString( "conditions", frame->conditions );
 		}
-		if ( frame->entity_num >= 0 ) {
-			Stef_Lua_PushInteger( "entity", frame->entity_num );
-		}
 	}
 }
 #endif
@@ -268,16 +261,13 @@ For printlevel LP_INFO trailing newline is automatically inserted, but for
 LP_DEVELOPER and LP_CONSOLE it must be included in the parameter.
 ==================
 */
-void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, int entity_num, const char *msg ) {
+void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, const char *msg ) {
 #if defined( STEF_LUA_EVENTS ) && defined( STEF_LOGGING_SYSTEM )
 	if ( !stef_lua_suppress_print_event && Stef_Lua_InitEventCall( STEF_LUA_EVENT_CONSOLE_PRINT ) ) {
 		Stef_Lua_PushString( "text", msg );
 		Stef_Lua_PushInteger( "printlevel", printlevel >= LP_CONSOLE ? 2 : printlevel >= LP_DEVELOPER ? 1 : 0 );
 		if ( conditions && *conditions ) {
 			Stef_Lua_PushString( "conditions", conditions );
-		}
-		if ( entity_num >= 0 ) {
-			Stef_Lua_PushInteger( "entitynum", entity_num );
 		}
 		if ( printlevel != LP_INFO ) {
 			Stef_Lua_PushBoolean( "no_auto_newline", qtrue );
@@ -308,22 +298,6 @@ void Logging_PrintExt( loggingPrintType_t printlevel, const char *conditions, in
 
 /*
 ==================
-Logging_PrintfExt
-==================
-*/
-void QDECL Logging_PrintfExt( loggingPrintType_t printType, const char *conditions, int entityNum, const char *fmt, ... ) {
-	va_list argptr;
-	char msg[MAXPRINTMSG];
-
-	va_start( argptr, fmt );
-	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
-	va_end( argptr );
-
-	Logging_PrintExt( printType, conditions, entityNum, msg );
-}
-
-/*
-==================
 Logging_Printf
 ==================
 */
@@ -335,7 +309,7 @@ void QDECL Logging_Printf( loggingPrintType_t printType, const char *conditions,
 	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 	va_end( argptr );
 
-	Logging_PrintExt( printType, conditions, -1, msg );
+	Logging_PrintExt( printType, conditions, msg );
 }
 
 #endif

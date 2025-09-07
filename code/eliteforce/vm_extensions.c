@@ -39,7 +39,6 @@ typedef enum {
 #ifdef STEF_LOGGING_SYSTEM
 	VMEXT_DEBUG_FRAME_ENTRY,
 	VMEXT_DEBUG_FRAME_EXIT,
-	VMEXT_DEBUG_CHECK_CONDITIONS,
 	VMEXT_DEBUG_PRINT_EXT,
 #endif
 #ifdef STEF_SERVER_BROWSER_EXTENSIONS
@@ -196,8 +195,6 @@ static int VMExt_CheckGetFunction( const char *command, vmIndex_t vm_type ) {
 		return VMEXT_DEBUG_FRAME_ENTRY;
 	if ( !Q_stricmp( command, "logging_frame_exit" ) )
 		return VMEXT_DEBUG_FRAME_EXIT;
-	if ( !Q_stricmp( command, "logging_check_conditions" ) )
-		return VMEXT_DEBUG_CHECK_CONDITIONS;
 	if ( !Q_stricmp( command, "logging_print_ext" ) )
 		return VMEXT_DEBUG_PRINT_EXT;
 #endif
@@ -257,19 +254,15 @@ qboolean VMExt_HandleVMSyscall( intptr_t *args, vmIndex_t vm_type, vm_t *vm,
 
 #ifdef STEF_LOGGING_SYSTEM
 		if ( function_id == VMEXT_DEBUG_FRAME_ENTRY ) {
-			Logging_FrameEntry( VMA( 1 ), VMA( 2 ), args[3], args[4], qtrue );
+			Logging_FrameEntry( VMA( 1 ), VMA( 2 ), args[3], qtrue );
 			return qtrue;
 		}
 		if ( function_id == VMEXT_DEBUG_FRAME_EXIT ) {
 			Logging_FrameExit( VMA( 1 ) );
 			return qtrue;
 		}
-		if ( function_id == VMEXT_DEBUG_CHECK_CONDITIONS ) {
-			*retval = 1;
-			return qtrue;
-		}
 		if ( function_id == VMEXT_DEBUG_PRINT_EXT ) {
-			Logging_PrintExt( 0, VMA( 1 ), args[2], VMA( 3 ) );
+			Logging_PrintExt( args[1], VMA( 2 ), VMA( 3 ) );
 			return qtrue;
 		}
 #endif
