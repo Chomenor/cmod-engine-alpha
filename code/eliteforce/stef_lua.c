@@ -395,8 +395,14 @@ Stef_Lua_CvarList
 =================
 */
 static int Stef_Lua_CvarList( lua_State *L ) {
+	// Need to patch current state for Stef_Lua_PushString to handle coroutines
+	lua_State *oldState = stef_lua_state;
+	stef_lua_state = L;
+
 	lua_newtable( L );
 	Stef_Lua_CvarEmitList();
+
+	stef_lua_state = oldState;
 	return 1;
 }
 
@@ -416,12 +422,12 @@ static int Stef_Lua_CvarForceSet( lua_State *L ) {
 
 /*
 =================
-Stef_Lua_CvarForceRestart
+Stef_Lua_CvarFullReset
 
-Only safe to call when no QVM is running.
+Do a full cvar reset, including game module cvars. Only safe to call when no QVM is running.
 =================
 */
-static int Stef_Lua_CvarForceRestart( lua_State *L ) {
+static int Stef_Lua_CvarFullReset( lua_State *L ) {
 	Cvar_Restart( qtrue );
 	return 0;
 }
@@ -578,7 +584,7 @@ static void Stef_Lua_SetupInterface( lua_State *L ) {
 	ADD_FUNCTION( "cvar_register", Stef_Lua_CvarRegister );
 	ADD_FUNCTION( "cvar_list", Stef_Lua_CvarList );
 	ADD_FUNCTION( "cvar_force_set", Stef_Lua_CvarForceSet );
-	ADD_FUNCTION( "cvar_force_restart", Stef_Lua_CvarForceRestart );
+	ADD_FUNCTION( "cvar_full_reset", Stef_Lua_CvarFullReset );
 	ADD_FUNCTION( "argc", Stef_Lua_Argc );
 	ADD_FUNCTION( "argv", Stef_Lua_Argv );
 	ADD_FUNCTION( "cmdstr", Stef_Lua_Cmdstr );
