@@ -1582,7 +1582,13 @@ fragments cleanly so each packet has close to the maximum amount of data.
 */
 static int SV_GetDownloadBlockSize( client_t *cl ) {
 	// Make sure blocksize is large enough to support large pk3 by a safe margin
+#ifdef ELITEFORCE
+	// Assume higher efficiency with compat protocol since it avoids huffman encoding
+	int paksizeBytesPerBlock = cl->compat ? ( cl->downloadSize / 32768 ) + 100 :
+			( cl->downloadSize / 32768 ) * 2 + 50;
+#else
 	int paksizeBytesPerBlock = ( cl->downloadSize / 32768 ) * 2 + 50;
+#endif
 
 	// Make sure blocksize is large enough to avoid block window bottleneck
 	int rateBytesPerBlock = DOWNLOAD_WINDOW_BYTES( cl ) / MAX_DOWNLOAD_WINDOW;
